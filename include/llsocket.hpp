@@ -11,12 +11,17 @@
 //   Includes   //
 ////////////////*/
 #if  defined(_WIN32) || defined(_WIN64)      /* WinSock2 sockets API     */
+    #undef  _WIN32_WINNT
     #define _WIN32_WINNT _WIN32_WINNT_VISTA
+    #include <stddef.h>
+    #include <stdint.h>
     #include <errno.h>
     #include <winsock2.h>
     #include <ws2tcpip.h>
     #undef  _WIN32_WINNT
 #else                                        /* standard BSD sockets API */
+    #include <stddef.h>
+    #include <stdint.h>
     #include <errno.h>
     #include <fcntl.h>
     #include <unistd.h>
