@@ -53,6 +53,8 @@
     #else
     #define LLSOCKET_PUBLIC     LLSOCKET_IMPORT
     #endif
+#else
+    #define LLSOCKET_PUBLIC
 #endif
 
 /*///////////////////////
