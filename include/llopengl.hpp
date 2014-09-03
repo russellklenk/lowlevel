@@ -245,6 +245,11 @@ struct pixel_transfer_h2d_t
 /*/////////////////
 //   Functions   //
 /////////////////*/
+/// @summary Given an OpenGL data type value, calculates the corresponding size.
+/// @param data_type The OpenGL data type value, for example, GL_UNSIGNED_BYTE.
+/// @return The size of a single element of the specified type, in bytes.
+LLOPENGL_PUBLIC size_t data_size(GLenum data_type);
+
 /// @summary Given an ASCII string name, calculates a 32-bit hash value. This
 /// function is used for generating names for shader attributes, uniforms and
 /// samplers, allowing for more efficient look-up by name.

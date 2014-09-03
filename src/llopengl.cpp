@@ -23,46 +23,57 @@
 /*///////////////////////
 //   Local Functions   //
 ///////////////////////*/
+/// @summary Rotates an unsigned 32-bit integer to the left, with wrapping.
+/// @param x The value to rotate.
+/// @param r The number of bits to rotate by.
+/// @return The rotated value.
 static inline uint32_t rotl32(uint32_t x, int8_t r)
 {
     return (x << r) | (x >> (32 - r));
 }
 
+/// @summary Rounds a value up to the nearest even multiple of a power of two.
+/// @param size The size value to round.
+/// @param pow2 The power of two value to round up to.
+/// @return The nearest even multiple of the specified power of two.
 static inline size_t align_up(size_t size, size_t pow2)
 {
     return (size != 0) ? ((size + (pow2 - 1)) & ~(pow2 - 1)) : pow2;
 }
 
-static size_t data_size(GLenum data_type)
+/*////////////////////////
+//   Public Functions   //
+////////////////////////*/
+size_t gl::data_size(GLenum data_type)
 {
     switch (data_type)
     {
-    case GL_UNSIGNED_BYTE:  return sizeof(GLubyte);
-    case GL_FLOAT:          return sizeof(GLfloat);
-    case GL_FLOAT_VEC2:     return sizeof(GLfloat) *  2;
-    case GL_FLOAT_VEC3:     return sizeof(GLfloat) *  3;
-    case GL_FLOAT_VEC4:     return sizeof(GLfloat) *  4;
-    case GL_INT:            return sizeof(GLint);
-    case GL_INT_VEC2:       return sizeof(GLint)   *  2;
-    case GL_INT_VEC3:       return sizeof(GLint)   *  3;
-    case GL_INT_VEC4:       return sizeof(GLint)   *  4;
-    case GL_BOOL:           return sizeof(GLint);
-    case GL_BOOL_VEC2:      return sizeof(GLint)   *  2;
-    case GL_BOOL_VEC3:      return sizeof(GLint)   *  3;
-    case GL_BOOL_VEC4:      return sizeof(GLint)   *  4;
-    case GL_FLOAT_MAT2:     return sizeof(GLfloat) *  4;
-    case GL_FLOAT_MAT3:     return sizeof(GLfloat) *  9;
-    case GL_FLOAT_MAT4:     return sizeof(GLfloat) * 16;
-    case GL_FLOAT_MAT2x3:   return sizeof(GLfloat) *  6;
-    case GL_FLOAT_MAT2x4:   return sizeof(GLfloat) *  8;
-    case GL_FLOAT_MAT3x2:   return sizeof(GLfloat) *  6;
-    case GL_FLOAT_MAT3x4:   return sizeof(GLfloat) * 12;
-    case GL_FLOAT_MAT4x2:   return sizeof(GLfloat) *  8;
-    case GL_FLOAT_MAT4x3:   return sizeof(GLfloat) * 12;
-    case GL_BYTE:           return sizeof(GLbyte);
-    case GL_UNSIGNED_SHORT: return sizeof(GLushort);
-    case GL_SHORT:          return sizeof(GLshort);
-    case GL_UNSIGNED_INT:   return sizeof(GLuint);
+    case GL_UNSIGNED_BYTE:               return sizeof(GLubyte);
+    case GL_FLOAT:                       return sizeof(GLfloat);
+    case GL_FLOAT_VEC2:                  return sizeof(GLfloat) *  2;
+    case GL_FLOAT_VEC3:                  return sizeof(GLfloat) *  3;
+    case GL_FLOAT_VEC4:                  return sizeof(GLfloat) *  4;
+    case GL_INT:                         return sizeof(GLint);
+    case GL_INT_VEC2:                    return sizeof(GLint)   *  2;
+    case GL_INT_VEC3:                    return sizeof(GLint)   *  3;
+    case GL_INT_VEC4:                    return sizeof(GLint)   *  4;
+    case GL_BOOL:                        return sizeof(GLint);
+    case GL_BOOL_VEC2:                   return sizeof(GLint)   *  2;
+    case GL_BOOL_VEC3:                   return sizeof(GLint)   *  3;
+    case GL_BOOL_VEC4:                   return sizeof(GLint)   *  4;
+    case GL_FLOAT_MAT2:                  return sizeof(GLfloat) *  4;
+    case GL_FLOAT_MAT3:                  return sizeof(GLfloat) *  9;
+    case GL_FLOAT_MAT4:                  return sizeof(GLfloat) * 16;
+    case GL_FLOAT_MAT2x3:                return sizeof(GLfloat) *  6;
+    case GL_FLOAT_MAT2x4:                return sizeof(GLfloat) *  8;
+    case GL_FLOAT_MAT3x2:                return sizeof(GLfloat) *  6;
+    case GL_FLOAT_MAT3x4:                return sizeof(GLfloat) * 12;
+    case GL_FLOAT_MAT4x2:                return sizeof(GLfloat) *  8;
+    case GL_FLOAT_MAT4x3:                return sizeof(GLfloat) * 12;
+    case GL_BYTE:                        return sizeof(GLbyte);
+    case GL_UNSIGNED_SHORT:              return sizeof(GLushort);
+    case GL_SHORT:                       return sizeof(GLshort);
+    case GL_UNSIGNED_INT:                return sizeof(GLuint);
     case GL_UNSIGNED_SHORT_5_6_5:        return sizeof(GLushort);
     case GL_UNSIGNED_SHORT_5_6_5_REV:    return sizeof(GLushort);
     case GL_UNSIGNED_SHORT_4_4_4_4:      return sizeof(GLushort);
@@ -80,9 +91,6 @@ static size_t data_size(GLenum data_type)
     return 0;
 }
 
-/*////////////////////////
-//   Public Functions   //
-////////////////////////*/
 uint32_t gl::shader_name(char const *name)
 {
     #define HAS_NULL_BYTE(x) (((x) - 0x01010101) & (~(x) & 0x80808080))
@@ -442,10 +450,10 @@ void gl::reflect_program_details(
         loc           = glGetAttribLocation(program, buffer);
         va.DataType   = (GLenum) type;
         va.Location   = (GLint)  loc;
-        va.DataSize   = (size_t) data_size(type) * sz;
+        va.DataSize   = (size_t) gl::data_size(type) * sz;
         va.DataOffset = (size_t) 0; // for application use only
         va.Dimension  = (size_t) sz;
-        attrib_names[num_attribs] = shader_name(buffer);
+        attrib_names[num_attribs] = gl::shader_name(buffer);
         attrib_info [num_attribs] = va;
         num_attribs++;
     }
@@ -524,7 +532,7 @@ void gl::reflect_program_details(
                     loc            = glGetUniformLocation(program, buffer);
                     uv.DataType    = (GLenum) type;
                     uv.Location    = (GLint)  loc;
-                    uv.DataSize    = (size_t) data_size(type) * sz;
+                    uv.DataSize    = (size_t) gl::data_size(type) * sz;
                     uv.DataOffset  = (size_t) 0; // for application use only
                     uv.Dimension   = (size_t) sz;
                     uniform_names[num_uniforms] = gl::shader_name(buffer);
@@ -543,7 +551,7 @@ void gl::set_sampler(gl::sampler_desc_t *sampler, GLuint texture)
     glUniform1i(sampler->Location, sampler->ImageUnit);
 }
 
-void set_uniform(gl::uniform_desc_t *uniform, void const *value, bool transpose)
+void gl::set_uniform(gl::uniform_desc_t *uniform, void const *value, bool transpose)
 {
     GLint          loc = uniform->Location;
     GLsizei        dim = uniform->Dimension;
@@ -577,7 +585,7 @@ void set_uniform(gl::uniform_desc_t *uniform, void const *value, bool transpose)
     }
 }
 
-void shader_source_init(gl::shader_source_t *source)
+void gl::shader_source_init(gl::shader_source_t *source)
 {
     source->StageCount = 0;
     for (size_t i = 0; i < GL_MAX_SHADER_STAGES; ++i)
@@ -588,7 +596,7 @@ void shader_source_init(gl::shader_source_t *source)
     }
 }
 
-void shader_source_add(gl::shader_source_t *source, GLenum shader_stage, char **source_code, size_t string_count)
+void gl::shader_source_add(gl::shader_source_t *source, GLenum shader_stage, char **source_code, size_t string_count)
 {
     if (source->StageCount < GL_MAX_SHADER_STAGES)
     {
@@ -599,7 +607,7 @@ void shader_source_add(gl::shader_source_t *source, GLenum shader_stage, char **
     }
 }
 
-bool build_shader(gl::shader_source_t *source, gl::shader_desc_t *shader, GLuint *out_program)
+bool gl::build_shader(gl::shader_source_t *source, gl::shader_desc_t *shader, GLuint *out_program)
 {
     GLuint shader_list[GL_MAX_SHADER_STAGES];
     GLuint program       = 0;
@@ -730,7 +738,7 @@ size_t gl::bytes_per_element(GLenum internal_format, GLenum data_type)
         case GL_RGB5_A1:
         case GL_RGB10_A2:
         case GL_RGB10_A2UI:
-            return (data_size(data_type) * 1);
+            return (gl::data_size(data_type) * 1);
 
         case GL_RG:
         case GL_RG8:
@@ -745,7 +753,7 @@ size_t gl::bytes_per_element(GLenum internal_format, GLenum data_type)
         case GL_RG16UI:
         case GL_RG32I:
         case GL_RG32UI:
-            return (data_size(data_type) * 2);
+            return (gl::data_size(data_type) * 2);
 
         case GL_RGB:
         case GL_RGB8:
@@ -760,7 +768,7 @@ size_t gl::bytes_per_element(GLenum internal_format, GLenum data_type)
         case GL_RGB16UI:
         case GL_RGB32I:
         case GL_RGB32UI:
-            return (data_size(data_type) * 3);
+            return (gl::data_size(data_type) * 3);
 
         case GL_RGBA:
         case GL_RGBA8:
@@ -774,7 +782,7 @@ size_t gl::bytes_per_element(GLenum internal_format, GLenum data_type)
         case GL_RGBA16UI:
         case GL_RGBA32I:
         case GL_RGBA32UI:
-            return (data_size(data_type) * 4);
+            return (gl::data_size(data_type) * 4);
 
         case GL_COMPRESSED_RGB_S3TC_DXT1_EXT:
         case GL_COMPRESSED_RGBA_S3TC_DXT1_EXT:
@@ -824,7 +832,7 @@ size_t gl::bytes_per_row(GLenum internal_format, GLenum data_type, size_t width,
         case GL_RGB5_A1:
         case GL_RGB10_A2:
         case GL_RGB10_A2UI:
-            return align_up(width * data_size(data_type), alignment);
+            return align_up(width * gl::data_size(data_type), alignment);
 
         case GL_RG:
         case GL_RG8:
@@ -839,7 +847,7 @@ size_t gl::bytes_per_row(GLenum internal_format, GLenum data_type, size_t width,
         case GL_RG16UI:
         case GL_RG32I:
         case GL_RG32UI:
-            return align_up(width * data_size(data_type) * 2, alignment);
+            return align_up(width * gl::data_size(data_type) * 2, alignment);
 
         case GL_RGB:
         case GL_RGB8:
@@ -854,7 +862,7 @@ size_t gl::bytes_per_row(GLenum internal_format, GLenum data_type, size_t width,
         case GL_RGB16UI:
         case GL_RGB32I:
         case GL_RGB32UI:
-            return align_up(width * data_size(data_type) * 3, alignment);
+            return align_up(width * gl::data_size(data_type) * 3, alignment);
 
         case GL_RGBA:
         case GL_RGBA8:
@@ -868,7 +876,7 @@ size_t gl::bytes_per_row(GLenum internal_format, GLenum data_type, size_t width,
         case GL_RGBA16UI:
         case GL_RGBA32I:
         case GL_RGBA32UI:
-            return align_up(width * data_size(data_type) * 4, alignment);
+            return align_up(width * gl::data_size(data_type) * 4, alignment);
 
         case GL_COMPRESSED_RGB_S3TC_DXT1_EXT:
         case GL_COMPRESSED_RGBA_S3TC_DXT1_EXT:
@@ -924,7 +932,7 @@ size_t gl::bytes_per_slice(
         case GL_RGB5_A1:
         case GL_RGB10_A2:
         case GL_RGB10_A2UI:
-            return align_up(width * data_size(data_type), alignment) * height;
+            return align_up(width * gl::data_size(data_type), alignment) * height;
 
         case GL_RG:
         case GL_RG8:
@@ -939,7 +947,7 @@ size_t gl::bytes_per_slice(
         case GL_RG16UI:
         case GL_RG32I:
         case GL_RG32UI:
-            return align_up(width * data_size(data_type) * 2, alignment) * height;
+            return align_up(width * gl::data_size(data_type) * 2, alignment) * height;
 
         case GL_RGB:
         case GL_RGB8:
@@ -954,7 +962,7 @@ size_t gl::bytes_per_slice(
         case GL_RGB16UI:
         case GL_RGB32I:
         case GL_RGB32UI:
-            return align_up(width * data_size(data_type) * 3, alignment) * height;
+            return align_up(width * gl::data_size(data_type) * 3, alignment) * height;
 
         case GL_RGBA:
         case GL_RGBA8:
@@ -968,7 +976,7 @@ size_t gl::bytes_per_slice(
         case GL_RGBA16UI:
         case GL_RGBA32I:
         case GL_RGBA32UI:
-            return align_up(width * data_size(data_type) * 4, alignment) * height;
+            return align_up(width * gl::data_size(data_type) * 4, alignment) * height;
 
         case GL_COMPRESSED_RGB_S3TC_DXT1_EXT:
         case GL_COMPRESSED_RGBA_S3TC_DXT1_EXT:
@@ -1002,7 +1010,7 @@ size_t gl::image_dimension(GLenum internal_format, size_t dimension)
         case GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT:
             // these formats operate on 4x4 blocks of pixels, so if a dimension
             // is not evenly divisible by four, it needs to be rounded up.
-            return (((dimension + 3) >> 2) * block_dimension(internal_format));
+            return (((dimension + 3) >> 2) * gl::block_dimension(internal_format));
 
         default:
             break;
