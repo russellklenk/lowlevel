@@ -489,6 +489,29 @@ size_t network::stream_read(
                 }
                 return 0;
 
+            case WSAENOBUFS:     // ENOBUFS
+                {
+                    // insufficient resources available in the system to
+                    // perform the operation. we'll wait (in select()) for
+                    // a bit to see if the socket becomes readable again;
+                    // otherwise, the socket is shutdown.
+                    if (wait_for_read(sockfd, LLSOCKET_WAIT_TIMEOUT_USEC))
+                    {
+                        // the socket is available again. retry.
+                        try_recv = true;
+                        retry_count++;
+                        continue; // back to the loop start
+                    }
+                    else
+                    {
+                        // the wait timed out. disconnect the socket.
+                        network::stream_shutdown(sockfd, NULL, NULL);
+                        LLSOCKET_SET_ERROR_RESULT(err);
+                        *out_disconnected = true;
+                    }
+                }
+                return 0;
+
             case WSANOTINITIALISED:
             case WSAENETDOWN:
             case WSAENOTCONN:
