@@ -19,6 +19,55 @@
 /*/////////////////
 //   Constants   //
 /////////////////*/
+/// @summary The vertex shader source code for rendering solid-colored quads
+/// specified in screen-space.
+static char const *SpriteShaderPTC_CLR_VSS =
+    "#version 330\n"
+    "uniform mat4 uMSS;\n"
+    "layout (location = 0) in vec4 aPTX;\n"
+    "layout (location = 1) in vec4 aCLR;\n"
+    "out vec4 vCLR;\n"
+    "void main() {\n"
+    "    vCLR = aCLR;\n"
+    "    gl_Position = uMSS * vec4(aPTX.x, aPTX.y, 0, 1);\n"
+    "}\n";
+
+/// @summary The fragment shader source code for rendering solid-colored quads
+/// specified in screen-space.
+static char const *SpriteShaderPTC_CLR_FSS =
+    "#version 330\n"
+    "in  vec4 vCLR;\n"
+    "out vec4 oCLR;\n"
+    "void main() {\n"
+    "    oCLR = vCLR;\n"
+    "}\n";
+
+/// @summary The vertex shader source code for rendering textured and tinted
+/// quads specified in screen-space.
+static char const *SpriteShaderPTC_TEX_VSS =
+    "#version 330\n"
+    "uniform mat4 uMSS;\n"
+    "layout (location = 0) in vec4 aPTX;\n"
+    "layout (location = 1) in vec4 aCLR;\n"
+    "out vec4 vCLR;\n"
+    "out vec2 vTEX;\n"
+    "void main() {\n"
+    "    vCLR = aCLR;\n"
+    "    vTEX = vec2(aPTX.z, aPTX.w);\n"
+    "    gl_Position = uMSS * vec4(aPTX.x, aPTX.y, 0, 1);\n"
+    "}\n";
+
+/// @summary The fragment shader source code for rendering textured and tinted
+/// quads specified in screen-space.
+static char const *SpriteShaderPTC_TEX_FSS =
+    "#version 330\n"
+    "uniform sampler2D sTEX;\n"
+    "in  vec2 vTEX;\n"
+    "in  vec4 vCLR;\n"
+    "out vec4 oCLR;\n"
+    "void main() {\n"
+    "    oCLR = texture(sTEX, vTEX) * vCLR;\n"
+    "}\n";
 
 /*///////////////////////
 //   Local Functions   //
@@ -1642,4 +1691,551 @@ void gl::transfer_pixels_h2d(gl::pixel_transfer_h2d_t *transfer)
         glPixelStorei(GL_UNPACK_SKIP_ROWS,    0);
     if (transfer->SourceZ != 0)
         glPixelStorei(GL_UNPACK_SKIP_IMAGES,  0);
+}
+
+void gl::create_sprite_batch(gl::sprite_batch_t *batch, size_t capacity)
+{
+    if (batch)
+    {
+        batch->Count    = 0;
+        batch->Capacity = capacity;
+        if (capacity)
+        {
+            batch->Quads = (gl::sprite_quad_t*)      malloc(capacity * sizeof(gl::sprite_quad_t));
+            batch->State = (gl::sprite_sort_data_t*) malloc(capacity * sizeof(gl::sprite_sort_data_t));
+            batch->Order = (uint32_t*)               malloc(capacity * sizeof(uint32_t));
+        }
+        else
+        {
+            batch->Quads = NULL;
+            batch->State = NULL;
+            batch->Order = NULL;
+        }
+    }
+}
+
+void gl::delete_sprite_batch(gl::sprite_batch_t *batch)
+{
+    if (batch)
+    {
+        if (batch->Capacity)
+        {
+            free(batch->Order);
+            free(batch->State);
+            free(batch->Quads);
+        }
+        batch->Count    = 0;
+        batch->Capacity = 0;
+        batch->Quads    = NULL;
+        batch->State    = NULL;
+        batch->Order    = NULL;
+    }
+}
+
+// need to pass batch->Count + NumToAdd as capacity
+void gl::ensure_sprite_batch(gl::sprite_batch_t *batch, size_t capacity)
+{
+    if (batch->Capacity < capacity)
+    {
+        batch->Capacity = capacity;
+        batch->Quads    = (gl::sprite_quad_t*)      realloc(batch->Quads, capacity * sizeof(gl::sprite_quad_t));
+        batch->State    = (gl::sprite_sort_data_t*) realloc(batch->State, capacity * sizeof(gl::sprite_sort_data_t));
+        batch->Order    = (uint32_t*)               realloc(batch->Order, capacity * sizeof(uint32_t));
+    }
+}
+
+void gl::flush_sprite_batch(gl::sprite_batch_t *batch)
+{
+    batch->Count = 0;
+}
+
+void gl::generate_quads(
+    gl::sprite_quad_t      *quads,
+    gl::sprite_sort_data_t *sdata,
+    uint32_t               *indices,
+    size_t                  quad_offset,
+    gl::sprite_t const     *sprites,
+    size_t                  sprite_offset,
+    size_t                  sprite_count)
+{
+    size_t qindex = quad_offset;
+    size_t sindex = sprite_offset;
+    for (size_t i = 0;  i < sprite_count; ++i, ++qindex, ++sindex)
+    {
+        gl::sprite_t const     &s = sprites[sindex];
+        gl::sprite_sort_data_t &r = sdata[qindex];
+        gl::sprite_quad_t      &q = quads[qindex];
+
+        q.Source[0]   = s.ImageX;
+        q.Source[1]   = s.ImageY;
+        q.Source[2]   = s.ImageWidth;
+        q.Source[3]   = s.ImageHeight;
+        q.Target[0]   = s.ScreenX;
+        q.Target[1]   = s.ScreenY;
+        q.Target[2]   = s.ImageWidth  * s.ScaleX;
+        q.Target[3]   = s.ImageHeight * s.ScaleY;
+        q.Origin[0]   = s.OriginX;
+        q.Origin[1]   = s.OriginY;
+        q.Scale [0]   = 1.0f / s.TextureWidth;
+        q.Scale [1]   = 1.0f / s.TextureHeight;
+        q.Orientation = s.Orientation;
+        q.TintColor   = s.TintColor;
+
+        r.LayerDepth  = s.LayerDepth;
+        r.RenderState = s.RenderState;
+
+        indices[qindex] = qindex;
+    }
+}
+
+void gl::generate_quad_vertices_ptc(
+    void                    *buffer,
+    size_t                   buffer_offset,
+    gl::sprite_quad_t const *quads,
+    uint32_t const          *indices,
+    size_t                   quad_offset,
+    size_t                   quad_count)
+{
+    static size_t const X      =  0;
+    static size_t const Y      =  1;
+    static size_t const W      =  2;
+    static size_t const H      =  3;
+    static float  const XCO[4] = {0.0f, 1.0f, 1.0f, 0.0f};
+    static float  const YCO[4] = {0.0f, 0.0f, 1.0f, 1.0f};
+
+    gl::sprite_vertex_ptc_t *vertex_buffer = (gl::sprite_vertex_ptc_t*) buffer;
+    size_t                   vertex_offset = buffer_offset;
+    for (size_t i = 0; i < quad_count; ++i)
+    {
+        // figure out which quad we're working with.
+        uint32_t const id = indices[quad_offset + i];
+        gl::sprite_quad_t const &quad = quads[id];
+
+        // pre-calculate values constant across the quad.
+        float    const src_x = quad.Source[X];
+        float    const src_y = quad.Source[Y];
+        float    const src_w = quad.Source[W];
+        float    const src_h = quad.Source[H];
+        float    const dst_x = quad.Target[X];
+        float    const dst_y = quad.Target[Y];
+        float    const dst_w = quad.Target[W];
+        float    const dst_h = quad.Target[H];
+        float    const ctr_x = quad.Origin[X] / src_w;
+        float    const ctr_y = quad.Origin[Y] / src_h;
+        float    const scl_u = quad.Scale[X];
+        float    const scl_v = quad.Scale[Y];
+        float    const angle = quad.Orientation;
+        uint32_t const color = quad.TintColor;
+        float    const sin_o = sinf(angle);
+        float    const cos_o = cosf(angle);
+
+        // calculate values that change per-vertex.
+        for (size_t j = 0; j < 4; ++j)
+        {
+            gl::sprite_vertex_ptc_t &vert = vertex_buffer[vertex_offset++];
+            float ofs_x    = XCO[j];
+            float ofs_y    = YCO[j];
+            float x_dst    = (ofs_x - ctr_x)  *  dst_w;
+            float y_dst    = (ofs_y - ctr_y)  *  dst_h;
+            vert.XYUV[0]   = (dst_x + (x_dst * cos_o)) - (y_dst * sin_o);
+            vert.XYUV[1]   = (dst_y + (x_dst * sin_o)) + (y_dst * cos_o);
+            vert.XYUV[2]   = (src_x + (ofs_x * src_w)) *  scl_u;
+            vert.XYUV[3]   = 1.0f - ((src_y + (ofs_y * src_h)) *  scl_v);
+            vert.TintColor = color;
+        }
+    }
+}
+
+void gl::generate_quad_indices_u16(void *buffer, size_t offset, size_t base_vertex, size_t quad_count)
+{
+    uint16_t *u16 = (uint16_t*) buffer;
+    uint16_t  b16 = (uint16_t ) base_vertex;
+    for (size_t i = 0; i < quad_count; ++i)
+    {
+        u16[offset++]  = (b16 + 1);
+        u16[offset++]  = (b16 + 0);
+        u16[offset++]  = (b16 + 2);
+        u16[offset++]  = (b16 + 2);
+        u16[offset++]  = (b16 + 0);
+        u16[offset++]  = (b16 + 3);
+        b16 += 4;
+    }
+}
+
+void gl::generate_quad_indices_u32(void *buffer, size_t offset, size_t base_vertex, size_t quad_count)
+{
+    uint32_t *u32 = (uint32_t*) buffer;
+    uint32_t  b32 = (uint32_t ) base_vertex;
+    for (size_t i = 0; i < quad_count; ++i)
+    {
+        u32[offset++]  = (b32 + 1);
+        u32[offset++]  = (b32 + 0);
+        u32[offset++]  = (b32 + 2);
+        u32[offset++]  = (b32 + 2);
+        u32[offset++]  = (b32 + 0);
+        u32[offset++]  = (b32 + 3);
+        b32 += 4;
+    }
+}
+
+bool gl::create_sprite_effect(gl::sprite_effect_t *effect, size_t quad_count, size_t vertex_size, size_t index_size)
+{
+    GLuint  vao        =  0;
+    GLuint  buffers[2] = {0, 0};
+    size_t  vcount     = quad_count  * 4;
+    size_t  icount     = quad_count  * 6;
+    GLsizei abo_size   = vertex_size * vcount;
+    GLsizei eao_size   = index_size  * icount;
+
+    glGenBuffers(2, buffers);
+    glBindBuffer(GL_ARRAY_BUFFER, buffers[0]);
+    glBufferData(GL_ARRAY_BUFFER, abo_size, NULL, GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffers[1]);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, eao_size, NULL, GL_DYNAMIC_DRAW);
+    glGenVertexArrays(1, &vao);
+
+    effect->VertexCapacity   = vcount;
+    effect->VertexOffset     = 0;
+    effect->VertexSize       = vertex_size;
+    effect->IndexCapacity    = icount;
+    effect->IndexOffset      = 0;
+    effect->IndexSize        = index_size;
+    effect->CurrentState     = 0xFFFFFFFFU;
+    effect->VertexArray      = vao;
+    effect->VertexBuffer     = buffers[0];
+    effect->IndexBuffer      = buffers[1];
+    effect->BlendEnabled     = GL_FALSE;
+    effect->BlendSourceColor = GL_ONE;
+    effect->BlendSourceAlpha = GL_ONE;
+    effect->BlendTargetColor = GL_ZERO;
+    effect->BlendTargetAlpha = GL_ZERO;
+    effect->BlendFuncColor   = GL_FUNC_ADD;
+    effect->BlendFuncAlpha   = GL_FUNC_ADD;
+    effect->BlendColor[0]    = 0.0f;
+    effect->BlendColor[1]    = 0.0f;
+    effect->BlendColor[2]    = 0.0f;
+    effect->BlendColor[3]    = 0.0f;
+    return true;
+}
+
+void gl::delete_sprite_effect(gl::sprite_effect_t *effect)
+{
+    GLuint buffers[2] = {
+        effect->VertexBuffer,
+        effect->IndexBuffer
+    };
+    glDeleteBuffers(2, buffers);
+    glDeleteVertexArrays(1, &effect->VertexArray);
+    effect->VertexCapacity = 0;
+    effect->VertexOffset   = 0;
+    effect->VertexSize     = 0;
+    effect->IndexCapacity  = 0;
+    effect->IndexOffset    = 0;
+    effect->IndexSize      = 0;
+    effect->VertexArray    = 0;
+    effect->VertexBuffer   = 0;
+    effect->IndexBuffer    = 0;
+}
+
+void gl::sprite_effect_blend_none(gl::sprite_effect_t *effect)
+{
+    effect->BlendEnabled     = GL_FALSE;
+    effect->BlendSourceColor = GL_ONE;
+    effect->BlendSourceAlpha = GL_ONE;
+    effect->BlendTargetColor = GL_ZERO;
+    effect->BlendTargetAlpha = GL_ZERO;
+    effect->BlendFuncColor   = GL_FUNC_ADD;
+    effect->BlendFuncAlpha   = GL_FUNC_ADD;
+    effect->BlendColor[0]    = 0.0f;
+    effect->BlendColor[1]    = 0.0f;
+    effect->BlendColor[2]    = 0.0f;
+    effect->BlendColor[3]    = 0.0f;
+}
+
+void gl::sprite_effect_blend_alpha(gl::sprite_effect_t *effect)
+{
+    effect->BlendEnabled     = GL_TRUE;
+    effect->BlendSourceColor = GL_SRC_COLOR;
+    effect->BlendSourceAlpha = GL_SRC_ALPHA;
+    effect->BlendTargetColor = GL_ONE_MINUS_SRC_ALPHA;
+    effect->BlendTargetAlpha = GL_ONE_MINUS_SRC_ALPHA;
+    effect->BlendFuncColor   = GL_FUNC_ADD;
+    effect->BlendFuncAlpha   = GL_FUNC_ADD;
+    effect->BlendColor[0]    = 0.0f;
+    effect->BlendColor[1]    = 0.0f;
+    effect->BlendColor[2]    = 0.0f;
+    effect->BlendColor[3]    = 0.0f;
+}
+
+void gl::sprite_effect_blend_additive(gl::sprite_effect_t *effect)
+{
+    effect->BlendEnabled     = GL_TRUE;
+    effect->BlendSourceColor = GL_SRC_COLOR;
+    effect->BlendSourceAlpha = GL_SRC_ALPHA;
+    effect->BlendTargetColor = GL_ONE;
+    effect->BlendTargetAlpha = GL_ONE;
+    effect->BlendFuncColor   = GL_FUNC_ADD;
+    effect->BlendFuncAlpha   = GL_FUNC_ADD;
+    effect->BlendColor[0]    = 0.0f;
+    effect->BlendColor[1]    = 0.0f;
+    effect->BlendColor[2]    = 0.0f;
+    effect->BlendColor[3]    = 0.0f;
+}
+
+void gl::sprite_effect_blend_premultiplied(gl::sprite_effect_t *effect)
+{
+    effect->BlendEnabled     = GL_TRUE;
+    effect->BlendSourceColor = GL_ONE;
+    effect->BlendSourceAlpha = GL_ONE;
+    effect->BlendTargetColor = GL_ONE_MINUS_SRC_ALPHA;
+    effect->BlendTargetAlpha = GL_ONE_MINUS_SRC_ALPHA;
+    effect->BlendFuncColor   = GL_FUNC_ADD;
+    effect->BlendFuncAlpha   = GL_FUNC_ADD;
+    effect->BlendColor[0]    = 0.0f;
+    effect->BlendColor[1]    = 0.0f;
+    effect->BlendColor[2]    = 0.0f;
+    effect->BlendColor[3]    = 0.0f;
+}
+
+void gl::sprite_effect_set_viewport(gl::sprite_effect_t *effect, int width, int height)
+{
+    float *dst16 = effect->Projection;
+    float  s_x = 1.0f / (width   * 0.5f);
+    float  s_y = 1.0f / (height  * 0.5f);
+    dst16[ 0]  = s_x ; dst16[ 1] = 0.0f; dst16[ 2] = 0.0f; dst16[ 3] = 0.0f;
+    dst16[ 4]  = 0.0f; dst16[ 5] = -s_y; dst16[ 6] = 0.0f; dst16[ 7] = 0.0f;
+    dst16[ 8]  = 0.0f; dst16[ 9] = 0.0f; dst16[10] = 1.0f; dst16[11] = 0.0f;
+    dst16[12]  =-1.0f; dst16[13] = 1.0f; dst16[14] = 0.0f; dst16[15] = 1.0f;
+}
+
+void gl::sprite_effect_bind_buffers(gl::sprite_effect_t *effect)
+{
+    glBindVertexArray(effect->VertexArray);
+    glBindBuffer(GL_ARRAY_BUFFER, effect->VertexBuffer);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, effect->IndexBuffer);
+}
+
+void gl::sprite_effect_apply_blendstate(gl::sprite_effect_t *effect)
+{
+    if (effect->BlendEnabled)
+    {
+        glEnable(GL_BLEND);
+        glBlendColor(effect->BlendColor[0], effect->BlendColor[1], effect->BlendColor[2], effect->BlendColor[3]);
+        glBlendFuncSeparate(effect->BlendSourceColor, effect->BlendTargetColor, effect->BlendSourceAlpha, effect->BlendTargetAlpha);
+        glBlendEquationSeparate(effect->BlendFuncColor, effect->BlendFuncAlpha);
+    }
+    else glDisable(GL_BLEND);
+}
+
+void gl::sprite_effect_setup_vao_ptc(gl::sprite_effect_t *effect)
+{
+    glBindVertexArray(effect->VertexArray);
+    glEnableVertexAttribArray(GL_SPRITE_PTC_LOCATION_PTX);
+    glEnableVertexAttribArray(GL_SPRITE_PTC_LOCATION_CLR);
+    glVertexAttribPointer(GL_SPRITE_PTC_LOCATION_PTX, 4, GL_FLOAT,         GL_FALSE, sizeof(gl::sprite_vertex_ptc_t), (GLvoid const*)  0);
+    glVertexAttribPointer(GL_SPRITE_PTC_LOCATION_CLR, 4, GL_UNSIGNED_BYTE, GL_TRUE,  sizeof(gl::sprite_vertex_ptc_t), (GLvoid const*) 16);
+}
+
+size_t gl::sprite_effect_buffer_data_ptc(
+    gl::sprite_effect_t     *effect,
+    gl::sprite_quad_t const *quads,
+    uint32_t const          *indices,
+    size_t                   quad_offset,
+    size_t                   quad_count,
+    size_t                  *base_index_arg)
+{
+    if (effect->VertexOffset == effect->VertexCapacity)
+    {
+        // the buffer is completely full. time to discard it and
+        // request a new buffer from the driver, to avoid stalls.
+        GLsizei abo_size     = effect->VertexCapacity * effect->VertexSize;
+        GLsizei eao_size     = effect->IndexCapacity  * effect->IndexSize;
+        effect->VertexOffset = 0;
+        effect->IndexOffset  = 0;
+        glBufferData(GL_ARRAY_BUFFER, abo_size, NULL, GL_DYNAMIC_DRAW);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, eao_size, NULL, GL_DYNAMIC_DRAW);
+    }
+
+    size_t num_indices  = quad_count * 6;
+    size_t num_vertices = quad_count * 4;
+    size_t max_vertices = effect->VertexCapacity;
+    size_t base_vertex  = effect->VertexOffset;
+    size_t vertex_size  = effect->VertexSize;
+    size_t max_indices  = effect->IndexCapacity;
+    size_t base_index   = effect->IndexOffset;
+    size_t index_size   = effect->IndexSize;
+    if (max_vertices < base_vertex + num_vertices)
+    {
+        // not enough space in the buffer to fit everything.
+        // only a portion of the desired data will be buffered.
+        num_vertices = max_vertices - base_vertex;
+        num_indices  = max_indices  - base_index;
+    }
+
+    size_t buffer_count =  num_vertices / 4;
+    if (buffer_count == 0) return 0;
+
+    GLintptr   v_offset = base_vertex  * vertex_size;
+    GLsizeiptr v_size   = num_vertices * vertex_size;
+    GLbitfield v_access = GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT | GL_MAP_UNSYNCHRONIZED_BIT;
+    GLvoid    *v_data   = glMapBufferRange(GL_ARRAY_BUFFER, v_offset, v_size, v_access);
+    if (v_data != NULL)
+    {
+        gl::generate_quad_vertices_ptc(v_data, 0, quads, indices, quad_offset, buffer_count);
+        glUnmapBuffer(GL_ARRAY_BUFFER);
+    }
+
+    GLintptr   i_offset = base_index  * index_size;
+    GLsizeiptr i_size   = num_indices * index_size;
+    GLbitfield i_access = GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT | GL_MAP_UNSYNCHRONIZED_BIT;
+    GLvoid    *i_data   = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, i_offset, i_size, i_access);
+    if (i_data != NULL)
+    {
+        if (index_size == sizeof(uint16_t)) gl::generate_quad_indices_u16(i_data, 0, base_vertex, buffer_count);
+        else gl::generate_quad_indices_u32(i_data, 0, base_vertex, buffer_count);
+        glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
+    }
+
+    effect->VertexOffset += buffer_count * 4;
+    effect->IndexOffset  += buffer_count * 6;
+    *base_index_arg       = base_index;
+    return buffer_count;
+}
+
+void gl::sprite_effect_draw_batch_ptc(
+    gl::sprite_effect_t             *effect,
+    gl::sprite_batch_t              *batch,
+    gl::sprite_effect_apply_t const *fxfuncs,
+    void                            *context)
+{
+    size_t quad_count = batch->Count;
+    size_t quad_index = 0;
+    size_t base_index = 0;
+    size_t n          = 0;
+
+    fxfuncs->SetupEffect(effect, context);
+    effect->CurrentState = 0xFFFFFFFFU;
+
+    while (quad_count > 0)
+    {
+        n = gl::sprite_effect_buffer_data_ptc(effect, batch->Quads, batch->Order, quad_index, quad_count, &base_index);
+        gl::sprite_effect_draw_batch_region_ptc(effect, batch, quad_index, n, base_index, fxfuncs, context);
+        base_index  = effect->IndexOffset;
+        quad_index += n;
+        quad_count -= n;
+    }
+}
+
+void gl::sprite_effect_draw_batch_region_ptc(
+    gl::sprite_effect_t             *effect,
+    gl::sprite_batch_t              *batch,
+    size_t                           quad_offset,
+    size_t                           quad_count,
+    size_t                           base_index,
+    gl::sprite_effect_apply_t const *fxfuncs,
+    void                            *context)
+{
+    uint32_t state_0 = effect->CurrentState;
+    uint32_t state_1 = effect->CurrentState;
+    size_t   index   = 0; // index of start of sub-batch
+    size_t   nquad   = 0; // count of quads in sub-batch
+    size_t   nindex  = 0; // count of indices in sub-batch
+    size_t   quad_id = 0; // quad insertion index
+    GLsizei  size    = effect->IndexSize;
+    GLenum   type    = size == 2 ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
+
+    for (size_t i = 0; i < quad_count; ++i)
+    {
+        quad_id = batch->Order[quad_offset + i];
+        state_1 = batch->State[quad_id].RenderState;
+        if (state_1 != state_0)
+        {
+            // render the previous sub-batch with the current state,
+            // as long as it has at least one quad in the sub-batch.
+            if (i > index)
+            {
+                nquad  = i - index;  // the number of quads being submitted
+                nindex = nquad * 6;  // the number of indices being submitted
+                glDrawElements(GL_TRIANGLES, nindex, type, GL_BUFFER_OFFSET(base_index * size));
+                base_index += nindex;
+            }
+            // now apply the new state and start a new sub-batch.
+            fxfuncs->ApplyState(effect, state_1, context);
+            state_0 = state_1;
+            index   = i;
+        }
+    }
+    // submit the remainder of the sub-batch.
+    nquad  = quad_count - index;
+    nindex = nquad * 6;
+    glDrawElements(GL_TRIANGLES, nindex, type, GL_BUFFER_OFFSET(base_index * size));
+    effect->CurrentState = state_1;
+}
+
+bool gl::create_sprite_shader_ptc_clr(gl::sprite_shader_ptc_clr_t *shader)
+{
+    if (shader)
+    {
+        gl::shader_source_t     sources;
+        gl::shader_source_init(&sources);
+        gl::shader_source_add (&sources, GL_VERTEX_SHADER,   (char**) &SpriteShaderPTC_CLR_VSS, 1);
+        gl::shader_source_add (&sources, GL_FRAGMENT_SHADER, (char**) &SpriteShaderPTC_CLR_FSS, 1);
+        if (gl::build_shader  (&sources, &shader->ShaderDesc, &shader->Program))
+        {
+            shader->AttribPTX  = gl::find_attribute(&shader->ShaderDesc, "aPTX");
+            shader->AttribCLR  = gl::find_attribute(&shader->ShaderDesc, "aCLR");
+            shader->UniformMSS = gl::find_uniform  (&shader->ShaderDesc, "uMSS");
+            return true;
+        }
+        else return false;
+    }
+    else return false;
+}
+
+void gl::delete_sprite_shader_ptc_clr(gl::sprite_shader_ptc_clr_t *shader)
+{
+    if (shader && shader->Program)
+    {
+        gl::shader_desc_free(&shader->ShaderDesc);
+        glDeleteProgram(shader->Program);
+        shader->AttribPTX  = NULL;
+        shader->AttribCLR  = NULL;
+        shader->UniformMSS = NULL;
+        shader->Program    = 0;
+    }
+}
+
+bool gl::create_sprite_shader_ptc_tex(gl::sprite_shader_ptc_tex_t *shader)
+{
+    if (shader)
+    {
+        gl::shader_source_t     sources;
+        gl::shader_source_init(&sources);
+        gl::shader_source_add (&sources, GL_VERTEX_SHADER,   (char**) &SpriteShaderPTC_TEX_VSS, 1);
+        gl::shader_source_add (&sources, GL_FRAGMENT_SHADER, (char**) &SpriteShaderPTC_TEX_FSS, 1);
+        if (gl::build_shader  (&sources, &shader->ShaderDesc, &shader->Program))
+        {
+            shader->AttribPTX  = gl::find_attribute(&shader->ShaderDesc, "aPTX");
+            shader->AttribCLR  = gl::find_attribute(&shader->ShaderDesc, "aCLR");
+            shader->SamplerTEX = gl::find_sampler  (&shader->ShaderDesc, "sTEX");
+            shader->UniformMSS = gl::find_uniform  (&shader->ShaderDesc, "uMSS");
+            return true;
+        }
+        else return false;
+    }
+    else return false;
+}
+
+void gl::delete_sprite_shader_ptc_tex(gl::sprite_shader_ptc_tex_t *shader)
+{
+    if (shader && shader->Program)
+    {
+        gl::shader_desc_free(&shader->ShaderDesc);
+        glDeleteProgram(shader->Program);
+        shader->AttribPTX  = NULL;
+        shader->AttribCLR  = NULL;
+        shader->SamplerTEX = NULL;
+        shader->UniformMSS = NULL;
+        shader->Program    = 0;
+    }
 }
