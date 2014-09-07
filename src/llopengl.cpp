@@ -639,7 +639,7 @@ bool gl::build_shader(gl::shader_source_t *source, gl::shader_desc_t *shader, GL
         glDeleteShader(shader_list[i]);
 
     // figure out how many attributes, samplers and uniforms we have.
-    name_buffer = (char*)  malloc(max_name);
+    name_buffer = (char*) malloc(max_name);
     gl::reflect_program_counts(program, name_buffer, max_name,
         false, &num_attribs, &num_samplers, &num_uniforms);
 

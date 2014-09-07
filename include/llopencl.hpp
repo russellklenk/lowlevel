@@ -57,7 +57,7 @@ namespace cl {
 //   Data Types  //
 /////////////////*/
 /// @summary Represents all of the metadata associated with an OpenCL platform.
-struct cl_platform_t
+struct platform_t
 {
     cl_platform_id Id;            /// The OpenCL unique platform identifier.
     char          *Name;          /// The name of the platform.
@@ -69,7 +69,7 @@ struct cl_platform_t
 
 /// @summary Represents all of the metadata associated with an OpenCL device,
 /// not including the device capabilities, which are stored and queried separately.
-struct cl_device_t
+struct device_t
 {
     cl_device_id   Id;            /// The OpenCL unique device identifier.
     cl_device_type Type;          /// CL_DEVICE_TYPE_CPU, CL_DEVICE_TYPE_GPU or CL_DEVICE_TYPE_ACCELERATOR.
@@ -82,7 +82,7 @@ struct cl_device_t
 };
 
 /// @summary Stores information about the capabilities of a device.
-struct cl_dev_caps_t
+struct device_caps_t
 {
     cl_bool                     LittleEndian;         /// CL_DEVICE_ENDIAN_LITTLE
     cl_bool                     SupportECC;           /// CL_DEVICE_ERROR_CORRECTION_SUPPORT
@@ -132,24 +132,24 @@ struct cl_dev_caps_t
 /// @return The number of OpenCL platforms on the system.
 cl_uint platform_count(void);
 
-/// @summary Initializes a single cl_platform_t structure.
+/// @summary Initializes a single cl::platform_t structure.
 /// @param platform The platform definition to initialize.
-void platform_init(cl_platform_t *platform);
+void platform_init(cl::platform_t *platform);
 
-/// @summary Releases resources associated with a cl_platform_t instance.
+/// @summary Releases resources associated with a cl::platform_t instance.
 /// @param platform The platform definition to free.
-void platform_free(cl_platform_t *platform);
+void platform_free(cl::platform_t *platform);
 
 /// @summary Queries the driver for information about a specific platform.
 /// @param platform The platform definition to populate.
 /// @param id The unique identifier of the OpenCL platform.
-void platform_info(cl_platform_t *platform, cl_platform_id const &id);
+void platform_info(cl::platform_t *platform, cl_platform_id const &id);
 
 /// @summary Determines whether a platform supports a given extension.
 /// @param platform The platform to query.
 /// @param extension The NULL-terminated extension name.
 /// @return true if the platform supports the specified extension.
-bool platform_support(cl_platform_t *platform, char const *extension);
+bool platform_support(cl::platform_t *platform, char const *extension);
 
 /// @summary Queries the number of devices of a given type on a platform.
 /// @param platform The OpenCL unique identifier of the platform to query.
@@ -157,38 +157,38 @@ bool platform_support(cl_platform_t *platform, char const *extension);
 /// @return The number of devices matching the specified criteria.
 cl_uint device_count(cl_platform_id const &platform, cl_device_type of_type);
 
-/// @summary Initializes a single cl_device_t structure.
+/// @summary Initializes a single cl::device_t structure.
 /// @param dev The device definition to initialize.
-void device_init(cl_device_t *dev);
+void device_init(cl::device_t *dev);
 
-/// @summary Releases resources associated with a cl_device_t instance.
+/// @summary Releases resources associated with a cl::device_t instance.
 /// @param dev The device definition to free.
-void device_free(cl_device_t *dev);
+void device_free(cl::device_t *dev);
 
 /// @summary Queries the driver for information about a specific device.
 /// @param dev The device definition to populate.
 /// @param platform The OpenCL unique identifier of the platform defining the device.
 /// @param id The OpenCL unique identifer of the device.
-void device_info(cl_device_t *dev, cl_platform_id const &platform, cl_device_id const &id);
+void device_info(cl::device_t *dev, cl_platform_id const &platform, cl_device_id const &id);
 
 /// @summary Determines whether a device supports a given extension.
 /// @param dev The device to query.
 /// @param extension The NULL-terminated extension name.
 /// @return true if the device supports the specified extension.
-bool device_support(cl_device_t *dev, char const *extension);
+bool device_support(cl::device_t *dev, char const *extension);
 
-/// @summary Initializes a single cl_dev_caps_t structure.
+/// @summary Initializes a single cl::device_caps_t structure.
 /// @param caps The device capabilities to initialize.
-void dev_caps_init(cl_dev_caps_t *caps);
+void device_caps_init(cl::device_caps_t *caps);
 
-/// @summary Releases resources associated with a cl_dev_caps_t instance.
+/// @summary Releases resources associated with a cl::device_caps_t instance.
 /// @param caps The device capabilities to free.
-void dev_caps_free(cl_dev_caps_t *caps);
+void device_caps_free(cl::device_caps_t *caps);
 
 /// @summary Query the capabilities for a device.
 /// @param caps The device capabilities structure to populate.
 /// @param device The OpenCL unique identifier of the device.
-void dev_caps_info(cl_dev_caps_t *caps, cl_device_id const &device);
+void device_caps_info(cl::device_caps_t *caps, cl_device_id const &device);
 
 /*/////////////////////
 //   Namespace End   //

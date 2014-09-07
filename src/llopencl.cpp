@@ -21,7 +21,7 @@ static const cl_uint MAX_PLATFORM_COUNT = (cl_uint) -1;
 ///////////////////////*/
 /// @summary Wraps the sequence of calls necessary to retrieve a string value
 /// using the clGetPlatformInfo API. The string storage is allocated using the
-/// standard C library function malloc(), and should be freed using free(). 
+/// standard C library function malloc(), and should be freed using free().
 /// The returned string is guaranteed to be NULL-terminated.
 /// @param id The OpenCL unique identifier of the platform to query.
 /// @param param The parameter value being queried.
@@ -39,7 +39,7 @@ static char* cl_platform_str(cl_platform_id const &id, cl_platform_info param)
 
 /// @summary Wraps the sequence of calls necessary to retrieve a string value
 /// using the clGetDeviceInfo API. The string storage is allocated using the
-/// standard C library function malloc(), and should be freed using free(). 
+/// standard C library function malloc(), and should be freed using free().
 /// The returned string is guaranteed to be NULL-terminated.
 /// @param id The OpenCL unique identifier of the device to query.
 /// @param param The parameter value being queried.
@@ -65,7 +65,7 @@ cl_uint cl::platform_count(void)
     return n;
 }
 
-void cl::platform_init(cl_platform_t *platform)
+void cl::platform_init(cl::platform_t *platform)
 {
     if (platform)
     {
@@ -78,7 +78,7 @@ void cl::platform_init(cl_platform_t *platform)
     }
 }
 
-void cl::platform_free(cl_platform_t *platform)
+void cl::platform_free(cl::platform_t *platform)
 {
     if (platform)
     {
@@ -96,7 +96,7 @@ void cl::platform_free(cl_platform_t *platform)
     }
 }
 
-void cl::platform_info(cl_platform_t *platform, cl_platform_id const &id)
+void cl::platform_info(cl::platform_t *platform, cl_platform_id const &id)
 {
     platform->Id         = id;
     platform->Name       = cl_platform_str(id, CL_PLATFORM_NAME);
@@ -106,7 +106,7 @@ void cl::platform_info(cl_platform_t *platform, cl_platform_id const &id)
     platform->Extensions = cl_platform_str(id, CL_PLATFORM_EXTENSIONS);
 }
 
-bool cl::platform_support(cl_platform_t *platform, char const *extension)
+bool cl::platform_support(cl::platform_t *platform, char const *extension)
 {
     return (strstr(platform->Extensions, extension) != NULL);
 }
@@ -118,7 +118,7 @@ cl_uint cl::device_count(cl_platform_id const &platform, cl_device_type of_type)
     return ndevs;
 }
 
-void cl::device_init(cl_device_t *dev)
+void cl::device_init(cl::device_t *dev)
 {
     if (dev)
     {
@@ -133,7 +133,7 @@ void cl::device_init(cl_device_t *dev)
     }
 }
 
-void cl::device_free(cl_device_t *dev)
+void cl::device_free(cl::device_t *dev)
 {
     if (dev)
     {
@@ -153,7 +153,7 @@ void cl::device_free(cl_device_t *dev)
     }
 }
 
-void cl::device_info(cl_device_t *dev, cl_platform_id const &platform, cl_device_id const &id)
+void cl::device_info(cl::device_t *dev, cl_platform_id const &platform, cl_device_id const &id)
 {
     dev->Id            = id;
     dev->Platform      = platform;
@@ -165,17 +165,17 @@ void cl::device_info(cl_device_t *dev, cl_platform_id const &platform, cl_device
     clGetDeviceInfo(id, CL_DEVICE_TYPE, sizeof(dev->Type), &dev->Type, NULL);
 }
 
-bool cl::device_support(cl_device_t *dev, char const *extension)
+bool cl::device_support(cl::device_t *dev, char const *extension)
 {
     return (strstr(dev->Extensions, extension) != NULL);
 }
 
-void cl::dev_caps_init(cl_dev_caps_t *caps)
+void cl::device_caps_init(cl::device_caps_t *caps)
 {
-    if(caps) memset(caps, 0, sizeof(cl_dev_caps_t));
+    if(caps) memset(caps, 0, sizeof(cl::device_caps_t));
 }
 
-void cl::dev_caps_free(cl_dev_caps_t *caps)
+void cl::device_caps_free(cl::device_caps_t *caps)
 {
     if (caps)
     {
@@ -185,7 +185,7 @@ void cl::dev_caps_free(cl_dev_caps_t *caps)
     }
 }
 
-void cl::dev_caps_info(cl_dev_caps_t *caps, cl_device_id const &device)
+void cl::device_caps_info(cl::device_caps_t *caps, cl_device_id const &device)
 {
     cl_uint mid = 0;
     clGetDeviceInfo(device, CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS, sizeof(mid), &mid, NULL);

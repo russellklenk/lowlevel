@@ -344,12 +344,12 @@ LLOPENGL_PUBLIC void copy_linker_log(GLuint program, char *buffer, size_t buffer
 /// @param num_samplers The number of active texture samplers for the program.
 /// @param num_uniforms The number of active uniforms for the program.
 /// @return true if memory was allocated successfully.
-LLOPENGL_PUBLIC bool shader_desc_alloc(shader_desc_t *desc, size_t num_attribs, size_t num_samplers, size_t num_uniforms);
+LLOPENGL_PUBLIC bool shader_desc_alloc(gl::shader_desc_t *desc, size_t num_attribs, size_t num_samplers, size_t num_uniforms);
 
 /// @summary Releases memory for a shader_desc_t structure using the standard
 /// C library free() function.
 /// @param desc The shader description to release.
-LLOPENGL_PUBLIC void shader_desc_free(shader_desc_t *desc);
+LLOPENGL_PUBLIC void shader_desc_free(gl::shader_desc_t *desc);
 
 /// @summary Counts the number of active vertex attribues, texture samplers
 /// and uniform values defined in a shader program.
@@ -395,32 +395,32 @@ LLOPENGL_PUBLIC void reflect_program_counts(
 /// @param uniform_info Pointer to an array to be filled with uniform
 /// descriptions.
 LLOPENGL_PUBLIC void reflect_program_details(
-    GLuint            program,
-    char             *buffer,
-    size_t            buffer_size,
-    bool              include_builtins,
-    uint32_t         *attrib_names,
-    attribute_desc_t *attrib_info,
-    uint32_t         *sampler_names,
-    sampler_desc_t   *sampler_info,
-    uint32_t         *uniform_names,
-    uniform_desc_t   *uniform_info);
+    GLuint                program,
+    char                 *buffer,
+    size_t                buffer_size,
+    bool                  include_builtins,
+    uint32_t             *attrib_names,
+    gl::attribute_desc_t *attrib_info,
+    uint32_t             *sampler_names,
+    gl::sampler_desc_t   *sampler_info,
+    uint32_t             *uniform_names,
+    gl::uniform_desc_t   *uniform_info);
 
 /// @summary Binds a texture object to a texture sampler for the currently bound shader program.
 /// @param sampler The description of the sampler to set.
 /// @param texture The OpenGL texture object to bind to the sampler.
-LLOPENGL_PUBLIC void set_sampler(sampler_desc_t *sampler, GLuint texture);
+LLOPENGL_PUBLIC void set_sampler(gl::sampler_desc_t *sampler, GLuint texture);
 
 /// @summary Sets a uniform value for the currently bound shader program.
 /// @param uniform The description of the uniform to set.
 /// @param value The data to copy to the uniform.
 /// @param transpose For matrix values, specify true to transpose the matrix
 /// elements before passing them to the shader program.
-LLOPENGL_PUBLIC void set_uniform(uniform_desc_t *uniform, void const *value, bool transpose);
+LLOPENGL_PUBLIC void set_uniform(gl::uniform_desc_t *uniform, void const *value, bool transpose);
 
 /// @summary Initializes a shader source code buffer to empty.
 /// @param source The source code buffer to clear.
-LLOPENGL_PUBLIC void shader_source_init(shader_source_t *source);
+LLOPENGL_PUBLIC void shader_source_init(gl::shader_source_t *source);
 
 /// @summary Adds source code for a shader stage to a shader source buffer.
 /// @param source The source code buffer to modify.
@@ -428,7 +428,7 @@ LLOPENGL_PUBLIC void shader_source_init(shader_source_t *source);
 /// @param source_code An array of NULL-terminated ASCII strings specifying the
 /// source code fragments for the specified shader stage.
 /// @param string_count The number of strings in the source_code array.
-LLOPENGL_PUBLIC void shader_source_add(shader_source_t *source, GLenum shader_stage, char **source_code, size_t string_count);
+LLOPENGL_PUBLIC void shader_source_add(gl::shader_source_t *source, GLenum shader_stage, char **source_code, size_t string_count);
 
 /// @summary Compiles, links and reflects a shader program.
 /// @param source The shader source code buffer.
@@ -436,7 +436,7 @@ LLOPENGL_PUBLIC void shader_source_add(shader_source_t *source, GLenum shader_st
 /// @param out_program On return, this address is set to the identifier of the
 /// OpenGL shader program object. If an error occurs, this value will be 0.
 /// @return true if the build process was successful.
-LLOPENGL_PUBLIC bool build_shader(shader_source_t *source, shader_desc_t *shader, GLuint *out_program);
+LLOPENGL_PUBLIC bool build_shader(gl::shader_source_t *source, gl:shader_desc_t *shader, GLuint *out_program);
 
 /// @summary Given an OpenGL block-compressed internal format identifier,
 /// determine the size of each compressed block, in pixels. For non block-
@@ -548,7 +548,7 @@ LLOPENGL_PUBLIC void describe_mipmaps(
     size_t            slice_count,
     size_t            alignment,
     size_t            max_levels,
-    level_desc_t *level_desc);
+    gl::level_desc_t *level_desc);
 
 /// @summary Fills a memory buffer with a checkerboard pattern. This is useful
 /// for indicating uninitialized textures and for testing. The image internal
@@ -595,12 +595,12 @@ LLOPENGL_PUBLIC void texture_storage(
 /// pixel data consists of the framebuffer contents, or the contents of a
 /// single mip-level of a texture image.
 /// @param transfer An object describing the transfer operation to execute.
-LLOPENGL_PUBLIC void transfer_pixels_d2h(pixel_transfer_d2h_t *transfer);
+LLOPENGL_PUBLIC void transfer_pixels_d2h(gl::pixel_transfer_d2h_t *transfer);
 
 /// @summary Copies pixel data from the host (CPU) to the device (GPU). The
 /// pixel data is copied to a single mip-level of a texture image.
 /// @param transfer An object describing the transfer operation to execute.
-LLOPENGL_PUBLIC void transfer_pixels_h2d(pixel_transfer_h2d_t *transfer);
+LLOPENGL_PUBLIC void transfer_pixels_h2d(gl::pixel_transfer_h2d_t *transfer);
 
 /*////////////////////////
 //   Inline Functions   //
@@ -639,7 +639,7 @@ static inline T* kv_find(char const *name_str, uint32_t const *name_list, T *val
 /// @param shader The shader program object to query.
 /// @param name A NULL-terminated ASCII string vertex attribute identifier.
 /// @return The corresponding vertex attribute definition, or NULL.
-static inline attribute_desc_t *find_attribute(shader_desc_t *shader, char const *name)
+static inline gl::attribute_desc_t *find_attribute(gl::shader_desc_t *shader, char const *name)
 {
     return gl::kv_find(name, shader->AttributeNames, shader->Attributes, shader->AttributeCount);
 }
@@ -648,7 +648,7 @@ static inline attribute_desc_t *find_attribute(shader_desc_t *shader, char const
 /// @param shader The shader program object to query.
 /// @param name A NULL-terminated ASCII string texture sampler identifier.
 /// @return The corresponding texture sampler definition, or NULL.
-static inline sampler_desc_t* find_sampler(shader_desc_t *shader, char const *name)
+static inline gl::sampler_desc_t* find_sampler(gl::shader_desc_t *shader, char const *name)
 {
     return gl::kv_find(name, shader->SamplerNames, shader->Samplers, shader->SamplerCount);
 }
@@ -657,7 +657,7 @@ static inline sampler_desc_t* find_sampler(shader_desc_t *shader, char const *na
 /// @param shader The shader program object to query.
 /// @param name A NULL-terminated ASCII string uniform variable identifier.
 /// @return The corresponding uniform variable definition, or NULL.
-static inline uniform_desc_t* find_uniform(shader_desc_t *shader, char const *name)
+static inline gl::uniform_desc_t* find_uniform(gl::shader_desc_t *shader, char const *name)
 {
     return gl::kv_find(name, shader->UniformNames, shader->Uniforms, shader->UniformCount);
 }
