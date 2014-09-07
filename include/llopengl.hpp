@@ -1078,6 +1078,43 @@ static inline void sort_sprite_batch(gl::sprite_batch_t *batch)
     std::sort(batch->Order, batch->Order + batch->Count, cmp);
 }
 
+/// @summary Clamps a floating-point value into the given range.
+/// @param x The value to clamp.
+/// @param lower The inclusive lower-bound.
+/// @param upper The inclusive upper-bound.
+/// @return The value X: lower <= X <= upper.
+static inline float clampf(float x, float lower, float upper)
+{
+    return (x < lower) ? lower : ((x > upper) ? upper : x);
+}
+
+/// @summary Converts an RGBA tuple into a packed 32-bit ABGR value.
+/// @param rgba The RGBA tuple, with each component in [0, 1].
+/// @return The color value packed into a 32-bit unsigned integer.
+static inline uint32_t abgr32(float const *rgba)
+{
+    uint32_t r = (uint32_t) gl::clampf(rgba[0] * 255.0f, 0.0f, 255.0f);
+    uint32_t g = (uint32_t) gl::clampf(rgba[1] * 255.0f, 0.0f, 255.0f);
+    uint32_t b = (uint32_t) gl::clampf(rgba[2] * 255.0f, 0.0f, 255.0f);
+    uint32_t a = (uint32_t) gl::clampf(rgba[3] * 255.0f, 0.0f, 255.0f);
+    return ((a << 24) | (b << 16) | (g << 8) | r);
+}
+
+/// @summary Converts an RGBA value into a packed 32-bit ABGR value.
+/// @param R The red channel value, in [0, 1].
+/// @param G The green channel value, in [0, 1].
+/// @param B The blue channel value, in [0, 1].
+/// @param A The alpha channel value, in [0, 1].
+/// @return The color value packed into a 32-bit unsigned integer.
+static inline uint32_t abgr32(float R, float G, float B, float A)
+{
+    uint32_t r = (uint32_t) gl::clampf(R * 255.0f, 0.0f, 255.0f);
+    uint32_t g = (uint32_t) gl::clampf(G * 255.0f, 0.0f, 255.0f);
+    uint32_t b = (uint32_t) gl::clampf(B * 255.0f, 0.0f, 255.0f);
+    uint32_t a = (uint32_t) gl::clampf(A * 255.0f, 0.0f, 255.0f);
+    return ((a << 24) | (b << 16) | (g << 8) | r);
+}
+
 /*/////////////////////
 //   Namespace End   //
 /////////////////////*/
