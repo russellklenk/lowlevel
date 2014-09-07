@@ -9,7 +9,7 @@
 ////////////////*/
 #include <string.h>
 #include <stdlib.h>
-#include "clinfo.hpp"
+#include "llopencl.hpp"
 
 /*/////////////////
 //   Constants   //
