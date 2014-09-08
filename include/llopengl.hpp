@@ -653,7 +653,7 @@ LLOPENGL_PUBLIC void shader_source_add(gl::shader_source_t *source, GLenum shade
 /// @param out_program On return, this address is set to the identifier of the
 /// OpenGL shader program object. If an error occurs, this value will be 0.
 /// @return true if the build process was successful.
-LLOPENGL_PUBLIC bool build_shader(gl::shader_source_t *source, gl:shader_desc_t *shader, GLuint *out_program);
+LLOPENGL_PUBLIC bool build_shader(gl::shader_source_t *source, gl::shader_desc_t *shader, GLuint *out_program);
 
 /// @summary Given an OpenGL block-compressed internal format identifier,
 /// determine the size of each compressed block, in pixels. For non block-
