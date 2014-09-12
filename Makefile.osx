@@ -1,5 +1,5 @@
-TARGET        = lib/liblowlevel.a
-LIBRARIES     = -lstdc++ -lm
+TARGET        = lib/libll.a
+LIBRARIES     = -lstdc++ -lm -framework Cocoa -framework OpenGL -framework OpenCL -framework OpenAL
 HEADERS       = $(wildcard include/*.hpp)
 SOURCES       = $(wildcard src/*.cpp)
 OBJECTS       = ${SOURCES:.cpp=.o}
@@ -17,10 +17,10 @@ all:: ${TARGET}
 ${TARGET}: ${OBJECTS}
 	ar rcs $@ $^
 
-${OBJECTS}: %.o: ${SOURCES} ${DEPENDENCIES}
+${OBJECTS}: %.o: %.cpp ${DEPENDENCIES}
 	${CC} ${INCLUDE_DIRS} ${CCFLAGS} ${PROJ_CCFLAGS} -o $@ -c $<
 
-${DEPENDENCIES}: %.dep: ${SOURCES} ${HEADERS} Makefile.osx
+${DEPENDENCIES}: %.dep: %.cpp ${HEADERS} Makefile.osx
 	${CC} ${INCLUDE_DIRS} ${CCFLAGS} ${PROJ_CCFLAGS} -MM $< > $@
 
 output:: ${TARGET}

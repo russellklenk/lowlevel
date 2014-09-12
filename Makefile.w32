@@ -7,7 +7,7 @@ DEPENDENCIES  = ${SOURCES:.cpp=.dep}
 INCLUDE_DIRS  = -I. -Iinclude
 LIBRARY_DIRS  = -Llib
 PROJ_WARNINGS = -Wall -Wextra
-PROJ_CCFLAGS  = -std=c++0x -O3 -fstrict-aliasing -D __STDC_FORMAT_MACROS
+PROJ_CCFLAGS  = -std=gnu++0x -O3 -fstrict-aliasing -D __STDC_FORMAT_MACROS -DLLOPENGL_USE_GLEW
 PROJ_LDFLAGS  =
 
 .PHONY: all clean distclean output
@@ -17,10 +17,10 @@ all:: ${TARGET}
 ${TARGET}: ${OBJECTS}
 	ar rcs $@ $^
 
-${OBJECTS}: %.o: ${SOURCES} ${DEPENDENCIES}
+${OBJECTS}: %.o: %.cpp ${DEPENDENCIES}
 	${CC} ${INCLUDE_DIRS} ${CCFLAGS} ${PROJ_CCFLAGS} -o $@ -c $<
 
-${DEPENDENCIES}: %.dep: ${SOURCES} ${HEADERS} Makefile.w32
+${DEPENDENCIES}: %.dep: %.cpp ${HEADERS} Makefile.w32
 	${CC} ${INCLUDE_DIRS} ${CCFLAGS} ${PROJ_CCFLAGS} -MM $< > $@
 
 output:: ${TARGET}

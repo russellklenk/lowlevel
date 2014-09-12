@@ -19,7 +19,7 @@
 // that platform GL headers are not #included in the block of code below.
 #if !defined(__glew_h__) && !defined(__GLEW_H__)
     #ifdef LLOPENGL_USE_GLEW
-        #include "glew.h"
+        #include "GL/glew.h"
         #ifndef  LLOPENGL_EXTERNAL_GL
         #define  LLOPENGL_EXTERNAL_GL
         #endif
