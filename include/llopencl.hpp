@@ -21,20 +21,25 @@
 /*////////////////////
 //   Preprocessor   //
 ////////////////////*/
-/// @summary Abstract away Windows 32-bit calling conventions.
+/// @summary Abstract away Windows 32-bit calling conventions and visibility.
 #if defined(_WIN32) && defined(_MSC_VER)
     #define  LLOPENCL_CALL_C    __cdecl
-#else
-    #define  LLOPENCL_CALL_C
-#endif
-
-/// @summary Abstract away Windows DLL import/export.
-#if defined(_MSC_VER)
+    #if   defined(_MSC_VER)
     #define  LLOPENCL_IMPORT    __declspec(dllimport)
     #define  LLOPENCL_EXPORT    __declspec(dllexport)
-#else
-    #define  LLOPENCL_IMPORT
+    #elif defined(__GNUC__)
+    #define  LLOPENCL_IMPORT    __attribute__((dllimport))
+    #define  LLOPENCL_EXPORT    __attribute__((dllexport))
+    #else
+    #define  LLOPENCL_IMPORT    
     #define  LLOPENCL_EXPORT
+    #endif
+#else
+    #define  LLOPENCL_CALL_C
+    #if __GNUC__ >= 4
+    #define  LLOPENCL_IMPORT    __attribute__((visibility("default")))
+    #define  LLOPENCL_EXPORT    __attribute__((visibility("default")))
+    #endif
 #endif
 
 /// @summary Define import/export based on whether we're being used as a DLL.

@@ -16,20 +16,25 @@
 /*////////////////////
 //   Preprocessor   //
 ////////////////////*/
-/// @summary Abstract away Windows 32-bit calling conventions.
+/// @summary Abstract away Windows 32-bit calling conventions and visibility.
 #if defined(_WIN32) && defined(_MSC_VER)
     #define  LLGUI_CALL_C    __cdecl
-#else
-    #define  LLGUI_CALL_C
-#endif
-
-/// @summary Abstract away Windows DLL import/export.
-#if defined(_MSC_VER)
+    #if   defined(_MSC_VER)
     #define  LLGUI_IMPORT    __declspec(dllimport)
     #define  LLGUI_EXPORT    __declspec(dllexport)
-#else
-    #define  LLGUI_IMPORT
+    #elif defined(__GNUC__)
+    #define  LLGUI_IMPORT    __attribute__((dllimport))
+    #define  LLGUI_EXPORT    __attribute__((dllexport))
+    #else
+    #define  LLGUI_IMPORT    
     #define  LLGUI_EXPORT
+    #endif
+#else
+    #define  LLGUI_CALL_C
+    #if __GNUC__ >= 4
+    #define  LLGUI_IMPORT    __attribute__((visibility("default")))
+    #define  LLGUI_EXPORT    __attribute__((visibility("default")))
+    #endif
 #endif
 
 /// @summary Define import/export based on whether we're being used as a DLL.
