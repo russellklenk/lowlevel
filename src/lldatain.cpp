@@ -1218,23 +1218,22 @@ bool data::dds_describe(
         for (size_t j = 0; j < nlevels && dst_i < max_levels; ++j)
         {
             data::dds_level_desc_t &dst = out_levels[dst_i++];
-            size_t lw = level_dimension(basew , j);
-            size_t lh = level_dimension(baseh , j);
-            size_t ld = level_dimension(based , j);
-            size_t lp = data::dds_pitch(format, lw);
-            size_t bh = max2<size_t>(1, (lh + 3) / 4);
-
-            dst.Index           = j;
-            dst.Width           = image_dimension(format, lw);
-            dst.Height          = image_dimension(format, lh);
-            dst.Slices          = ld;
-            dst.BytesPerElement = bcn ? blocksz : (bitspp / 8); // DXGI_FORMAT_R1_UNORM...?
-            dst.BytesPerRow     = lp;
-            dst.BytesPerSlice   = bcn ? lp * bh : lp * lh;
-            dst.DataSize        = dst.BytesPerSlice  * ld;
-            dst.LevelData       = (void*) (p + offset);
-            dst.Format          = format;
-            offset             += dst.DataSize;
+            size_t levelw        = level_dimension(basew , j);
+            size_t levelh        = level_dimension(baseh , j);
+            size_t leveld        = level_dimension(based , j);
+            size_t levelp        = data::dds_pitch(format, levelw);
+            size_t blockh        = max2<size_t>(1, (levelh + 3) / 4);
+            dst.Index            = j;
+            dst.Width            = image_dimension(format, levelw);
+            dst.Height           = image_dimension(format, levelh);
+            dst.Slices           = leveld;
+            dst.BytesPerElement  = bcn ? blocksz : (bitspp / 8); // DXGI_FORMAT_R1_UNORM...?
+            dst.BytesPerRow      = levelp;
+            dst.BytesPerSlice    = bcn ? levelp * blockh : levelp * levelh;
+            dst.DataSize         = dst.BytesPerSlice  * leveld;
+            dst.LevelData        = (void*) (p + offset);
+            dst.Format           = format;
+            offset              += dst.DataSize;
         }
     }
     return (offset <= data_size);
