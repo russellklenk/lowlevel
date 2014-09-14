@@ -1222,6 +1222,7 @@ bool data::dds_describe(
             size_t lh = level_dimension(baseh , j);
             size_t ld = level_dimension(based , j);
             size_t lp = data::dds_pitch(format, lw);
+            size_t bh = max2<size_t>(1, (lh + 3) / 4);
 
             dst.Index           = j;
             dst.Width           = image_dimension(format, lw);
@@ -1229,17 +1230,11 @@ bool data::dds_describe(
             dst.Slices          = ld;
             dst.BytesPerElement = bcn ? blocksz : (bitspp / 8); // DXGI_FORMAT_R1_UNORM...?
             dst.BytesPerRow     = lp;
-            if (bcn)
-            {
-                size_t bh = max2<size_t>(1, (lh + 3) / 4);
-                dst.BytesPerSlice = lp * bh;
-            }
-            else dst.BytesPerSlice = lp * lh;
-
-            dst.DataSize  = dst.BytesPerSlice * ld;
-            dst.LevelData = (void*) (p + offset);
-            dst.Format    = format;
-            offset       += dst.DataSize;
+            dst.BytesPerSlice   = bcn ? lp * bh : lp * lh;
+            dst.DataSize        = dst.BytesPerSlice  * ld;
+            dst.LevelData       = (void*) (p + offset);
+            dst.Format          = format;
+            offset             += dst.DataSize;
         }
     }
     return (offset <= data_size);
