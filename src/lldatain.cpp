@@ -111,6 +111,15 @@ static T const* data_at(void const *buf, ptrdiff_t offset)
     return (T const*) data_ptr;
 }
 
+/// @summary Returns the minimum of two values.
+/// @param a...b The input values.
+/// @return The larger of the input values.
+template<class T>
+static const T& min2(const T& a, const T& b)
+{
+    return (a < b) ? a : b;
+}
+
 /// @summary Returns the maximum of two values.
 /// @param a...b The input values.
 /// @return The larger of the input values.
@@ -118,6 +127,33 @@ template<class T>
 static const T& max2(const T& a, const T& b)
 {
     return (a < b) ? b : a;
+}
+
+/// @summary Calculates the dimension of a mipmap level. This function may be
+/// used to calculate the width, height or depth dimensions.
+/// @param dimension The dimension of the highest-resolution level (level 0.)
+/// @param level_index The zero-based index of the miplevel to compute.
+/// @return The corresponding dimension of the specified mipmap level.
+static inline size_t level_dimension(size_t dimension, size_t level_index)
+{
+    size_t  l_dimension  = dimension >> level_index;
+    return (l_dimension == 0) ? 1 : l_dimension;
+}
+
+/// @summary Calculates the dimension of an image, in pixels, and accounting
+/// for block compression. Note that only width and height should be calculated
+/// using this logic as block compression is 2D-only.
+/// @param format One of data::dxgi_format_e.
+/// @param dimension The width or height of an image.
+/// @return The width or height, in pixels.
+static inline size_t image_dimension(uint32_t format, size_t dimension)
+{
+    if (data::dds_block_compressed(format))
+    {
+        // all BC formats encode 4x4 blocks.
+        return max2<size_t>(1, ((dimension + 3) / 4) * 4);
+    }
+    else return max2<size_t>(1, dimension);
 }
 
 /*////////////////////////
@@ -871,6 +907,89 @@ bool data::dds_packed(uint32_t format)
     else return false;
 }
 
+bool data::dds_cubemap(data::dds_header_t const *header, data::dds_header_dxt10_t const *header_ex)
+{
+    if (header_ex)
+    {
+        if (header_ex->Dimension == data::D3D11_RESOURCE_DIMENSION_TEXTURE2D &&
+            header_ex->Flags     == data::D3D11_RESOURCE_MISC_TEXTURECUBE)
+        {
+            return true;
+        }
+        // else fall through and look at the dds_header_t.
+    }
+    if (header)
+    {
+        if ((header->Caps  & data::DDSCAPS_COMPLEX) == 0)
+            return false;
+        if ((header->Caps2 & data::DDSCAPS2_CUBEMAP) == 0)
+            return false;
+        if ((header->Caps2 & data::DDSCAPS2_CUBEMAP_POSITIVEX) ||
+            (header->Caps2 & data::DDSCAPS2_CUBEMAP_NEGATIVEX) ||
+            (header->Caps2 & data::DDSCAPS2_CUBEMAP_POSITIVEY) ||
+            (header->Caps2 & data::DDSCAPS2_CUBEMAP_NEGATIVEY) ||
+            (header->Caps2 & data::DDSCAPS2_CUBEMAP_POSITIVEZ) ||
+            (header->Caps2 & data::DDSCAPS2_CUBEMAP_NEGATIVEZ))
+            return true;
+    }
+    return false;
+}
+
+bool data::dds_volume(data::dds_header_t const *header, data::dds_header_dxt10_t const *header_ex)
+{
+    if (header_ex)
+    {
+        if (header_ex->ArraySize != 1)
+        {
+            // arrays of volumes are not supported.
+            return false;
+        }
+    }
+    if (header)
+    {
+        if ((header->Caps  & data::DDSCAPS_COMPLEX) == 0)
+            return false;
+        if ((header->Caps2 & data::DDSCAPS2_VOLUME) == 0)
+            return false;
+        if ((header->Flags & data::DDSD_DEPTH) == 0)
+            return false;
+        return header->Depth > 1;
+    }
+    return false;
+}
+
+bool data::dds_array(data::dds_header_t const *header, data::dds_header_dxt10_t const *header_ex)
+{
+    if (header && header_ex)
+    {
+        return header_ex->ArraySize > 1;
+    }
+    return false;
+}
+
+bool data::dds_mipmap(data::dds_header_t const *header, data::dds_header_dxt10_t const *header_ex)
+{
+    if (header_ex)
+    {
+        if (header_ex->Dimension != data::D3D11_RESOURCE_DIMENSION_TEXTURE1D &&
+            header_ex->Dimension != data::D3D11_RESOURCE_DIMENSION_TEXTURE2D &&
+            header_ex->Dimension != data::D3D11_RESOURCE_DIMENSION_TEXTURE3D)
+            return false;
+    }
+    if (header)
+    {
+        if ((header->Caps  & DDSCAPS_COMPLEX) == 0)
+            return false;
+        if ((header->Caps  & DDSCAPS_MIPMAP) == 0)
+            return false;
+        if ((header->Flags & DDSD_MIPMAPCOUNT) == 0)
+            return false;
+
+        return header->Levels > 0;
+    }
+    return false;
+}
+
 size_t data::dds_bits_per_pixel(uint32_t format)
 {
     switch (format)
@@ -1031,4 +1150,97 @@ size_t data::dds_bytes_per_block(uint32_t format)
             break;
     }
     return 0;
+}
+
+size_t data::dds_array_count(data::dds_header_t const *header, data::dds_header_dxt10_t const *header_ex)
+{
+    if (header && header_ex)
+    {
+        // DX10 extended header is required for surface arrays.
+        return size_t(header_ex->ArraySize);
+    }
+    else if (header) return 1;
+    else return 0;
+}
+
+size_t data::dds_level_count(data::dds_header_t const *header, data::dds_header_dxt10_t const *header_ex)
+{
+    if (data::dds_mipmap(header, header_ex))
+    {
+        return header->Levels + 1;
+    }
+    else if (header) return 1;
+    else return 0;
+}
+
+bool data::dds_describe(
+    void                     const *data,
+    size_t                          data_size,
+    data::dds_header_t       const *header,
+    data::dds_header_dxt10_t const *header_ex,
+    data::dds_level_desc_t         *out_levels,
+    size_t                          max_levels)
+{
+    uint32_t  format = data::DXGI_FORMAT_UNKNOWN;
+    uint8_t const *p = (uint8_t const*) data;
+    size_t offset    = 0;
+    size_t basew     = 0;
+    size_t baseh     = 0;
+    size_t based     = 0;
+    size_t bitspp    = 0;
+    size_t blocksz   = 0;
+    size_t nitems    = data::dds_array_count(header, header_ex);
+    size_t nlevels   = data::dds_level_count(header, header_ex);
+    size_t dst_i     = 0;
+    bool   bcn       = false;
+
+    if (header == NULL)
+    {
+        // the base DDS header is required.
+        return false;
+    }
+
+    // get some basic data about the DDS.
+    format  = data::dds_format(header, header_ex);
+    bitspp  = data::dds_bits_per_pixel(format);
+    blocksz = data::dds_bytes_per_block(format);
+    basew   = (header->Flags & data::DDSD_WIDTH)  ? header->Width  : 0;
+    baseh   = (header->Flags & data::DDSD_HEIGHT) ? header->Height : 0;
+    based   = data::dds_volume(header, header_ex) ? header->Depth  : 1;
+    bcn     = (blocksz > 0);
+
+    // now update the byte offset and data pointer, and write the output.
+    offset += sizeof(uint32_t);
+    offset += sizeof(data::dds_header_t);
+    if (header_ex) offset += sizeof(data::dds_header_dxt10_t);
+    for (size_t i = 0; i < nitems && dst_i < max_levels; ++i)
+    {
+        for (size_t j = 0; j < nlevels && dst_i < max_levels; ++j)
+        {
+            data::dds_level_desc_t &dst = out_levels[dst_i++];
+            size_t lw = level_dimension(basew , j);
+            size_t lh = level_dimension(baseh , j);
+            size_t ld = level_dimension(based , j);
+            size_t lp = data::dds_pitch(format, lw);
+
+            dst.Index           = j;
+            dst.Width           = image_dimension(format, lw);
+            dst.Height          = image_dimension(format, lh);
+            dst.Slices          = ld;
+            dst.BytesPerElement = bcn ? blocksz : (bitspp / 8); // DXGI_FORMAT_R1_UNORM...?
+            dst.BytesPerRow     = lp;
+            if (bcn)
+            {
+                size_t bh = max2<size_t>(1, (lh + 3) / 4);
+                dst.BytesPerSlice = lp * bh;
+            }
+            else dst.BytesPerSlice = lp * lh;
+
+            dst.DataSize  = dst.BytesPerSlice * ld;
+            dst.LevelData = (void*) (p + offset);
+            dst.Format    = format;
+            offset       += dst.DataSize;
+        }
+    }
+    return (offset <= data_size);
 }

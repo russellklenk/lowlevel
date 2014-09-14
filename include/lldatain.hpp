@@ -314,11 +314,11 @@ enum dxgi_format_e
 /// for the DDS_HEADER_DXT10 structure.
 enum d3d11_resource_dimension_e
 {
-    D3D10_RESOURCE_DIMENSION_UNKNOWN        = 0,
-    D3D10_RESOURCE_DIMENSION_BUFFER         = 1,
-    D3D10_RESOURCE_DIMENSION_TEXTURE1D      = 2,
-    D3D10_RESOURCE_DIMENSION_TEXTURE2D      = 3,
-    D3D10_RESOURCE_DIMENSION_TEXTURE3D      = 4
+    D3D11_RESOURCE_DIMENSION_UNKNOWN        = 0,
+    D3D11_RESOURCE_DIMENSION_BUFFER         = 1,
+    D3D11_RESOURCE_DIMENSION_TEXTURE1D      = 2,
+    D3D11_RESOURCE_DIMENSION_TEXTURE2D      = 3,
+    D3D11_RESOURCE_DIMENSION_TEXTURE3D      = 4
 };
 
 /// @summary Values for dds_header_dxt10_t::Flags. See MSDN documentation at:
@@ -391,6 +391,22 @@ struct dds_header_dxt10_t
     uint32_t Flags2;          /// One of dds_alpha_mode_e.
 };
 #pragma pack(pop)
+
+/// @summary Describes a single level within the mipmap pyramid in a DDS. Level
+/// zero represents the highest-resolution surface (the base surface.)
+struct dds_level_desc_t
+{
+    size_t   Index;           /// The zero-based index of the mip-level.
+    size_t   Width;           /// The width of the surface.
+    size_t   Height;          /// The height of the surface.
+    size_t   Slices;          /// The depth of the surface.
+    size_t   BytesPerElement; /// The number of bytes per-pixel or block.
+    size_t   BytesPerRow;     /// The number of bytes between scanlines.
+    size_t   BytesPerSlice;   /// The number of bytes between slices.
+    size_t   DataSize;        /// The total size of the data for the level, in bytes.
+    void    *LevelData;       /// Pointer to the start of the level data.
+    uint32_t Format;          /// One of dxgi_format_e.
+};
 
 /*////////////////
 //   Functions  //
@@ -524,6 +540,31 @@ LLDATAIN_PUBLIC bool dds_block_compressed(uint32_t format);
 /// @return true if format is one of DXGI_FORMAT_R8G8_B8G8_UNORM or DXGI_FORMAT_G8R8_G8B8_UNORM.
 LLDATAIN_PUBLIC bool dds_packed(uint32_t format);
 
+/// @summary Determines if a DDS describes a cubemap surface.
+/// @param header The base surface header of the DDS.
+/// @param header_ex The extended surface header of the DDS, or NULL.
+/// @return true if the DDS describes a cubemap.
+LLDATAIN_PUBLIC bool dds_cubemap(dds_header_t const *header, dds_header_dxt10_t const *header_ex);
+
+/// @summary Determines if a DDS describes a volume surface.
+/// @param header The base surface header of the DDS.
+/// @param header_ex The extended surface header of the DDS, or NULL.
+/// @return true if the DDS describes a volume.
+LLDATAIN_PUBLIC bool dds_volume(dds_header_t const *header, dds_header_dxt10_t const *header_ex);
+
+/// @summary Determines if a DDS describes a surface array. Note that a volume
+/// is not considered to be the same as a surface array.
+/// @param header The base surface header of the DDS.
+/// @param header_ex The extended surface header of the DDS, or NULL.
+/// @return true if the DDS describes a surface array.
+LLDATAIN_PUBLIC bool dds_array(dds_header_t const *header, dds_header_dxt10_t const *header_ex);
+
+/// @summary Determines if a DDS describes a mipmap chain.
+/// @param header The base surface header of the DDS.
+/// @param header_ex The extended surface header of the DDS, or NULL.
+/// @return true if the DDS describes a mipmap chain.
+LLDATAIN_PUBLIC bool dds_mipmap(dds_header_t const *header, dds_header_dxt10_t const *header_ex);
+
 /// @summary Calculate the number of bits-per-pixel for a given format. Block-
 /// compressed formats are supported as well.
 /// @param format One of dxgi_format_e.
@@ -534,6 +575,36 @@ LLDATAIN_PUBLIC size_t dds_bits_per_pixel(uint32_t format);
 /// @param format One of dxgi_format_e.
 /// @return The number of bytes in a 4x4 pixel block, or 0 for non-block-compressed formats.
 LLDATAIN_PUBLIC size_t dds_bytes_per_block(uint32_t format);
+
+/// @summary Determines the number of elements in a surface array.
+/// @param header The base surface header of the DDS.
+/// @param header_ex The extended surface header of the DDS, or NULL.
+/// @return The number of elements in the surface array, or 1 if the DDS does not describe an array.
+LLDATAIN_PUBLIC size_t dds_array_count(dds_header_t const *header, dds_header_dxt10_t const *header_ex);
+
+/// @summary Determines the number of levels in the mipmap chain.
+/// @param header The base surface header of the DDS.
+/// @param header_ex The extended surface header of the DDS, or NULL.
+/// @return The number of levels in the mipmap chain, or 1 if the DDS describes the top level only.
+LLDATAIN_PUBLIC size_t dds_level_count(dds_header_t const *header, dds_header_dxt10_t const *header_ex);
+
+/// @summary Retrieves a description of and pointer to the start of the data for a mipmap level.
+/// @param data The buffer from which the data should be read.
+/// @param data_size The maximum number of bytes to read from the input buffer.
+/// @param header The base surface header of the DDS.
+/// @param header_ex The extended surface header of the DDS, or NULL.
+/// @param array_index The zero-based index of the array element to read, or 0.
+/// @param level_index The zero-based index of the mipmap level to describe, or 0.
+/// @param out_levels A buffer of dds_array_count() * dds_level_count() level
+/// descriptors to populate with data (or max_levels, whichever is less.)
+/// @param max_levels The maximum number of items to write to out_levels.
+LLDATAIN_PUBLIC bool dds_describe(
+    void const               *data,
+    size_t                    data_size,
+    dds_header_t const       *header,
+    dds_header_dxt10_t const *header_ex,
+    dds_level_desc_t         *out_levels,
+    size_t                    max_levels);
 
 /// @summary Generates a little-endian FOURCC.
 /// @param a...d The four characters comprising the code.
