@@ -86,6 +86,9 @@ static signed char const Base64_Indices[] =
 /*///////////////////////
 //   Local Functions   //
 ///////////////////////*/
+/// @summary Determines the size of a file. Supports file sizes larger than 4GB.
+/// @param file The file pointer to query.
+/// @return The size of the file, in bytes.
 static uint64_t file_size(FILE *file)
 {
     int64_t curr  = FTELLO_FUNC(file);
@@ -93,6 +96,28 @@ static uint64_t file_size(FILE *file)
     int64_t endp  = FTELLO_FUNC(file);
     FSEEKO_FUNC(file, curr, SEEK_SET);
     return uint64_t(endp);
+}
+
+/// @summary Utility function to return a pointer to the data at a given byte
+/// offset from the start of a buffer, cast to the desired type.
+/// @param buf Pointer to the buffer.
+/// @param offset The byte offset relative to the buffer pointer.
+/// @return A pointer to the data at the specified byte offset.
+template <typename T>
+static T const* data_at(void const *buf, ptrdiff_t offset)
+{
+    uint8_t const *base_ptr = (uint8_t const*) buf;
+    uint8_t const *data_ptr = base_ptr + offset;
+    return (T const*) data_ptr;
+}
+
+/// @summary Returns the maximum of two values.
+/// @param a...b The input values.
+/// @return The larger of the input values.
+template<class T>
+static const T& max2(const T& a, const T& b)
+{
+    return (a < b) ? b : a;
 }
 
 /*////////////////////////
@@ -527,4 +552,483 @@ void* data::load_binary(char const *path, size_t *out_buffer_size)
         if (out_buffer_size) *out_buffer_size = 0;
         return NULL;
     }
+}
+
+bool data::dds_header(void const *data, size_t data_size, data::dds_header_t *out_header)
+{
+    size_t const offset   = sizeof(uint32_t);
+    size_t const min_size = offset + sizeof(data::dds_header_t);
+
+    if (data == NULL)
+    {
+        // no input data specified.
+        return false;
+    }
+    if (data_size < min_size)
+    {
+        // not enough input data specified.
+        return false;
+    }
+
+    uint32_t magic = *((uint32_t const*) data);
+    if (magic != LLDATAIN_DDS_MAGIC_LE)
+    {
+        // invalid magic bytes, we expect 'DDS '.
+        return false;
+    }
+
+    if (out_header)
+    {
+        *out_header = *(data_at<dds_header_t>(data, offset));
+    }
+    return true;
+}
+
+bool data::dds_header_dxt10(void const *data, size_t data_size, data::dds_header_dxt10_t *out_header)
+{
+    data::dds_header_t header;
+    if (data::dds_header(data, data_size, &header))
+    {
+        size_t const    offset   = sizeof(uint32_t) + sizeof(data::dds_header_t);
+        size_t const    min_size = offset + sizeof(data::dds_header_dxt10_t);
+        if (data_size < min_size)
+        {
+            // not enough input data specified.
+            return false;
+        }
+
+        if ((header.Format.Flags & data::DDPF_FOURCC) == 0)
+        {
+            // no fourCC present on this file.
+            return false;
+        }
+
+        if (header.Format.FourCC != data::fourcc_le('D','X','1','0'))
+        {
+            // the expected DX10 fourCC isn't present, so there's no header.
+            return false;
+        }
+
+        if (out_header)
+        {
+            *out_header = *(data_at<data::dds_header_dxt10_t>(data, offset));
+        }
+        return true;
+    }
+    else return false;
+}
+
+uint32_t data::dds_format(data::dds_header_t const *header, data::dds_header_dxt10_t const *header_ex)
+{
+    if (header_ex != NULL)
+    {
+        return header_ex->Format;
+    }
+    if (header == NULL)
+    {
+        return data::DXGI_FORMAT_UNKNOWN;
+    }
+
+    data::dds_pixelformat_t const &pf = header->Format;
+    #define ISBITMASK(r, g, b, a) (pf.BitMaskR == (r) && pf.BitMaskG == (g) && pf.BitMaskB == (b) && pf.BitMaskA == (a))
+
+    if (pf.Flags & data::DDPF_FOURCC)
+    {
+        if (pf.FourCC == data::fourcc_le('D','X','T','1'))
+        {
+            return data::DXGI_FORMAT_BC1_UNORM;
+        }
+        if (pf.FourCC == data::fourcc_le('D','X','T','2'))
+        {
+            return data::DXGI_FORMAT_BC2_UNORM;
+        }
+        if (pf.FourCC == data::fourcc_le('D','X','T','3'))
+        {
+            return data::DXGI_FORMAT_BC2_UNORM;
+        }
+        if (pf.FourCC == data::fourcc_le('D','X','T','4'))
+        {
+            return data::DXGI_FORMAT_BC3_UNORM;
+        }
+        if (pf.FourCC == data::fourcc_le('D','X','T','5'))
+        {
+            return data::DXGI_FORMAT_BC3_UNORM;
+        }
+        if (pf.FourCC == data::fourcc_le('A','T','I','1'))
+        {
+            return data::DXGI_FORMAT_BC4_UNORM;
+        }
+        if (pf.FourCC == data::fourcc_le('A','T','I','2'))
+        {
+            return data::DXGI_FORMAT_BC5_UNORM;
+        }
+        if (pf.FourCC == data::fourcc_le('B','C','4','U'))
+        {
+            return data::DXGI_FORMAT_BC4_UNORM;
+        }
+        if (pf.FourCC == data::fourcc_le('B','C','4','S'))
+        {
+            return data::DXGI_FORMAT_BC4_SNORM;
+        }
+        if (pf.FourCC == data::fourcc_le('B','C','5','U'))
+        {
+            return data::DXGI_FORMAT_BC5_UNORM;
+        }
+        if (pf.FourCC == data::fourcc_le('B','C','5','S'))
+        {
+            return data::DXGI_FORMAT_BC5_SNORM;
+        }
+        switch (pf.FourCC)
+        {
+            case 36: // D3DFMT_A16B16G16R16
+                return data::DXGI_FORMAT_R16G16B16A16_UNORM;
+
+            case 110: // D3DFMT_Q16W16V16U16
+                return data::DXGI_FORMAT_R16G16B16A16_SNORM;
+
+            case 111: // D3DFMT_R16F
+                return data::DXGI_FORMAT_R16_FLOAT;
+
+            case 112: // D3DFMT_G16R16F
+                return data::DXGI_FORMAT_R16G16_FLOAT;
+
+            case 113: // D3DFMT_A16B16G16R16F
+                return data::DXGI_FORMAT_R16G16B16A16_FLOAT;
+
+            case 114: // D3DFMT_R32F
+                return data::DXGI_FORMAT_R32_FLOAT;
+
+            case 115: // D3DFMT_G32R32F
+                return data::DXGI_FORMAT_R32G32_FLOAT;
+
+            case 116: // D3DFMT_A32B32G32R32F
+                return data::DXGI_FORMAT_R32G32B32A32_FLOAT;
+
+            default:
+                break;
+        }
+        return data::DXGI_FORMAT_UNKNOWN;
+    }
+    if (pf.Flags & data::DDPF_RGB)
+    {
+        switch (pf.RGBBitCount)
+        {
+            case 32:
+                {
+                    if (ISBITMASK(0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000))
+                    {
+                        return data::DXGI_FORMAT_R8G8B8A8_UNORM;
+                    }
+                    if (ISBITMASK(0x00ff0000, 0x0000ff00, 0x000000ff, 0xff000000))
+                    {
+                        return data::DXGI_FORMAT_B8G8R8A8_UNORM;
+                    }
+                    if (ISBITMASK(0x00ff0000, 0x0000ff00, 0x000000ff, 0x00000000))
+                    {
+                        return data::DXGI_FORMAT_B8G8R8X8_UNORM;
+                    }
+
+                    // No DXGI format maps to ISBITMASK(0x000000ff, 0x0000ff00, 0x00ff0000, 0x00000000) aka D3DFMT_X8B8G8R8
+                    // Note that many common DDS reader/writers (including D3DX) swap the the RED/BLUE masks for 10:10:10:2
+                    // formats. We assumme below that the 'backwards' header mask is being used since it is most likely
+                    // written by D3DX. The more robust solution is to use the 'DX10' header extension and specify the
+                    // DXGI_FORMAT_R10G10B10A2_UNORM format directly.
+
+                    // For 'correct' writers, this should be 0x000003ff, 0x000ffc00, 0x3ff00000 for RGB data.
+                    if (ISBITMASK(0x3ff00000, 0x000ffc00, 0x000003ff, 0xc0000000))
+                    {
+                        return data::DXGI_FORMAT_R10G10B10A2_UNORM;
+                    }
+                    // No DXGI format maps to ISBITMASK(0x000003ff, 0x000ffc00, 0x3ff00000, 0xc0000000) aka D3DFMT_A2R10G10B10.
+                    if (ISBITMASK(0x0000ffff, 0xffff0000, 0x00000000, 0x00000000))
+                    {
+                        return data::DXGI_FORMAT_R16G16_UNORM;
+                    }
+                    if (ISBITMASK(0xffffffff, 0x00000000, 0x00000000, 0x00000000))
+                    {
+                        // Only 32-bit color channel format in D3D9 was R32F
+                        return data::DXGI_FORMAT_R32_FLOAT; // D3DX writes this out as a FourCC of 114.
+                    }
+                }
+                break;
+
+            case 24:
+                // No 24bpp DXGI formats aka D3DFMT_R8G8B8
+                break;
+
+            case 16:
+                {
+                    if (ISBITMASK(0x7c00, 0x03e0, 0x001f, 0x8000))
+                    {
+                        return data::DXGI_FORMAT_B5G5R5A1_UNORM;
+                    }
+                    if (ISBITMASK(0xf800, 0x07e0, 0x001f, 0x0000))
+                    {
+                        return data::DXGI_FORMAT_B5G6R5_UNORM;
+                    }
+                    // No DXGI format maps to ISBITMASK(0x7c00, 0x03e0, 0x001f, 0x0000) aka D3DFMT_X1R5G5B5.
+                    if (ISBITMASK(0x0f00, 0x00f0, 0x000f, 0xf000))
+                    {
+                        return data::DXGI_FORMAT_B4G4R4A4_UNORM;
+                    }
+                    // No DXGI format maps to ISBITMASK(0x0f00, 0x00f0, 0x000f, 0x0000) aka D3DFMT_X4R4G4B4.
+                    // No 3:3:2, 3:3:2:8, or paletted DXGI formats aka D3DFMT_A8R3G3B2, D3DFMT_R3G3B2, D3DFMT_P8, D3DFMT_A8P8, etc.
+                }
+                break;
+        }
+    }
+    if (pf.Flags & data::DDPF_ALPHA)
+    {
+        if (pf.RGBBitCount == 8)
+        {
+            return data::DXGI_FORMAT_A8_UNORM;
+        }
+    }
+    if (pf.Flags & data::DDPF_LUMINANCE)
+    {
+        if (pf.RGBBitCount == 8)
+        {
+            if (ISBITMASK(0x000000ff, 0x00000000, 0x00000000, 0x00000000))
+            {
+                // D3DX10/11 writes this out as DX10 extension.
+                return data::DXGI_FORMAT_R8_UNORM;
+            }
+
+            // No DXGI format maps to ISBITMASK(0x0f, 0x00, 0x00, 0xf0) aka D3DFMT_A4L4
+        }
+        if (pf.RGBBitCount == 16)
+        {
+            if (ISBITMASK(0x0000ffff, 0x00000000, 0x00000000, 0x00000000))
+            {
+                // D3DX10/11 writes this out as DX10 extension.
+                return data::DXGI_FORMAT_R16_UNORM;
+            }
+            if (ISBITMASK(0x000000ff, 0x00000000, 0x00000000, 0x0000ff00))
+            {
+                // D3DX10/11 writes this out as DX10 extension
+                return data::DXGI_FORMAT_R8G8_UNORM;
+            }
+        }
+    }
+    #undef ISBITMASK
+    return data::DXGI_FORMAT_UNKNOWN;
+}
+
+size_t data::dds_pitch(uint32_t format, uint32_t width)
+{
+    if (data::dds_block_compressed(format))
+    {
+        size_t bw = max2<size_t>(1, (width + 3) / 4);
+        return bw * data::dds_bytes_per_block(format);
+    }
+    if (data::dds_packed(format))
+    {
+        return ((width + 1) >> 1) * 4;
+    }
+    return (width * data::dds_bits_per_pixel(format) + 7) / 8;
+}
+
+bool data::dds_block_compressed(uint32_t format)
+{
+    switch (format)
+    {
+        case data::DXGI_FORMAT_BC1_TYPELESS:
+        case data::DXGI_FORMAT_BC1_UNORM:
+        case data::DXGI_FORMAT_BC1_UNORM_SRGB:
+        case data::DXGI_FORMAT_BC4_TYPELESS:
+        case data::DXGI_FORMAT_BC4_UNORM:
+        case data::DXGI_FORMAT_BC4_SNORM:
+        case data::DXGI_FORMAT_BC2_TYPELESS:
+        case data::DXGI_FORMAT_BC2_UNORM:
+        case data::DXGI_FORMAT_BC2_UNORM_SRGB:
+        case data::DXGI_FORMAT_BC3_TYPELESS:
+        case data::DXGI_FORMAT_BC3_UNORM:
+        case data::DXGI_FORMAT_BC3_UNORM_SRGB:
+        case data::DXGI_FORMAT_BC5_TYPELESS:
+        case data::DXGI_FORMAT_BC5_UNORM:
+        case data::DXGI_FORMAT_BC5_SNORM:
+        case data::DXGI_FORMAT_BC6H_TYPELESS:
+        case data::DXGI_FORMAT_BC6H_UF16:
+        case data::DXGI_FORMAT_BC6H_SF16:
+        case data::DXGI_FORMAT_BC7_TYPELESS:
+        case data::DXGI_FORMAT_BC7_UNORM:
+        case data::DXGI_FORMAT_BC7_UNORM_SRGB:
+            return true;
+
+        default:
+            break;
+    }
+    return false;
+}
+
+bool data::dds_packed(uint32_t format)
+{
+    if (format == data::DXGI_FORMAT_R8G8_B8G8_UNORM ||
+        format == data::DXGI_FORMAT_G8R8_G8B8_UNORM)
+    {
+        return true;
+    }
+    else return false;
+}
+
+size_t data::dds_bits_per_pixel(uint32_t format)
+{
+    switch (format)
+    {
+        case data::DXGI_FORMAT_R32G32B32A32_TYPELESS:
+        case data::DXGI_FORMAT_R32G32B32A32_FLOAT:
+        case data::DXGI_FORMAT_R32G32B32A32_UINT:
+        case data::DXGI_FORMAT_R32G32B32A32_SINT:
+            return 128;
+
+        case data::DXGI_FORMAT_R32G32B32_TYPELESS:
+        case data::DXGI_FORMAT_R32G32B32_FLOAT:
+        case data::DXGI_FORMAT_R32G32B32_UINT:
+        case data::DXGI_FORMAT_R32G32B32_SINT:
+            return 96;
+
+        case data::DXGI_FORMAT_R16G16B16A16_TYPELESS:
+        case data::DXGI_FORMAT_R16G16B16A16_FLOAT:
+        case data::DXGI_FORMAT_R16G16B16A16_UNORM:
+        case data::DXGI_FORMAT_R16G16B16A16_UINT:
+        case data::DXGI_FORMAT_R16G16B16A16_SNORM:
+        case data::DXGI_FORMAT_R16G16B16A16_SINT:
+        case data::DXGI_FORMAT_R32G32_TYPELESS:
+        case data::DXGI_FORMAT_R32G32_FLOAT:
+        case data::DXGI_FORMAT_R32G32_UINT:
+        case data::DXGI_FORMAT_R32G32_SINT:
+        case data::DXGI_FORMAT_R32G8X24_TYPELESS:
+        case data::DXGI_FORMAT_D32_FLOAT_S8X24_UINT:
+        case data::DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS:
+        case data::DXGI_FORMAT_X32_TYPELESS_G8X24_UINT:
+            return 64;
+
+        case data::DXGI_FORMAT_R10G10B10A2_TYPELESS:
+        case data::DXGI_FORMAT_R10G10B10A2_UNORM:
+        case data::DXGI_FORMAT_R10G10B10A2_UINT:
+        case data::DXGI_FORMAT_R11G11B10_FLOAT:
+        case data::DXGI_FORMAT_R8G8B8A8_TYPELESS:
+        case data::DXGI_FORMAT_R8G8B8A8_UNORM:
+        case data::DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
+        case data::DXGI_FORMAT_R8G8B8A8_UINT:
+        case data::DXGI_FORMAT_R8G8B8A8_SNORM:
+        case data::DXGI_FORMAT_R8G8B8A8_SINT:
+        case data::DXGI_FORMAT_R16G16_TYPELESS:
+        case data::DXGI_FORMAT_R16G16_FLOAT:
+        case data::DXGI_FORMAT_R16G16_UNORM:
+        case data::DXGI_FORMAT_R16G16_UINT:
+        case data::DXGI_FORMAT_R16G16_SNORM:
+        case data::DXGI_FORMAT_R16G16_SINT:
+        case data::DXGI_FORMAT_R32_TYPELESS:
+        case data::DXGI_FORMAT_D32_FLOAT:
+        case data::DXGI_FORMAT_R32_FLOAT:
+        case data::DXGI_FORMAT_R32_UINT:
+        case data::DXGI_FORMAT_R32_SINT:
+        case data::DXGI_FORMAT_R24G8_TYPELESS:
+        case data::DXGI_FORMAT_D24_UNORM_S8_UINT:
+        case data::DXGI_FORMAT_R24_UNORM_X8_TYPELESS:
+        case data::DXGI_FORMAT_X24_TYPELESS_G8_UINT:
+        case data::DXGI_FORMAT_R9G9B9E5_SHAREDEXP:
+        case data::DXGI_FORMAT_R8G8_B8G8_UNORM:
+        case data::DXGI_FORMAT_G8R8_G8B8_UNORM:
+        case data::DXGI_FORMAT_B8G8R8A8_UNORM:
+        case data::DXGI_FORMAT_B8G8R8X8_UNORM:
+        case data::DXGI_FORMAT_R10G10B10_XR_BIAS_A2_UNORM:
+        case data::DXGI_FORMAT_B8G8R8A8_TYPELESS:
+        case data::DXGI_FORMAT_B8G8R8A8_UNORM_SRGB:
+        case data::DXGI_FORMAT_B8G8R8X8_TYPELESS:
+        case data::DXGI_FORMAT_B8G8R8X8_UNORM_SRGB:
+            return 32;
+
+        case data::DXGI_FORMAT_R8G8_TYPELESS:
+        case data::DXGI_FORMAT_R8G8_UNORM:
+        case data::DXGI_FORMAT_R8G8_UINT:
+        case data::DXGI_FORMAT_R8G8_SNORM:
+        case data::DXGI_FORMAT_R8G8_SINT:
+        case data::DXGI_FORMAT_R16_TYPELESS:
+        case data::DXGI_FORMAT_R16_FLOAT:
+        case data::DXGI_FORMAT_D16_UNORM:
+        case data::DXGI_FORMAT_R16_UNORM:
+        case data::DXGI_FORMAT_R16_UINT:
+        case data::DXGI_FORMAT_R16_SNORM:
+        case data::DXGI_FORMAT_R16_SINT:
+        case data::DXGI_FORMAT_B5G6R5_UNORM:
+        case data::DXGI_FORMAT_B5G5R5A1_UNORM:
+        case data::DXGI_FORMAT_B4G4R4A4_UNORM:
+            return 16;
+
+        case data::DXGI_FORMAT_R8_TYPELESS:
+        case data::DXGI_FORMAT_R8_UNORM:
+        case data::DXGI_FORMAT_R8_UINT:
+        case data::DXGI_FORMAT_R8_SNORM:
+        case data::DXGI_FORMAT_R8_SINT:
+        case data::DXGI_FORMAT_A8_UNORM:
+            return 8;
+
+        case data::DXGI_FORMAT_R1_UNORM:
+            return 1;
+
+        case data::DXGI_FORMAT_BC1_TYPELESS:
+        case data::DXGI_FORMAT_BC1_UNORM:
+        case data::DXGI_FORMAT_BC1_UNORM_SRGB:
+        case data::DXGI_FORMAT_BC4_TYPELESS:
+        case data::DXGI_FORMAT_BC4_UNORM:
+        case data::DXGI_FORMAT_BC4_SNORM:
+            return 4;
+
+        case data::DXGI_FORMAT_BC2_TYPELESS:
+        case data::DXGI_FORMAT_BC2_UNORM:
+        case data::DXGI_FORMAT_BC2_UNORM_SRGB:
+        case data::DXGI_FORMAT_BC3_TYPELESS:
+        case data::DXGI_FORMAT_BC3_UNORM:
+        case data::DXGI_FORMAT_BC3_UNORM_SRGB:
+        case data::DXGI_FORMAT_BC5_TYPELESS:
+        case data::DXGI_FORMAT_BC5_UNORM:
+        case data::DXGI_FORMAT_BC5_SNORM:
+        case data::DXGI_FORMAT_BC6H_TYPELESS:
+        case data::DXGI_FORMAT_BC6H_UF16:
+        case data::DXGI_FORMAT_BC6H_SF16:
+        case data::DXGI_FORMAT_BC7_TYPELESS:
+        case data::DXGI_FORMAT_BC7_UNORM:
+        case data::DXGI_FORMAT_BC7_UNORM_SRGB:
+            return 8;
+
+        default:
+            return 0;
+    }
+}
+
+size_t data::dds_bytes_per_block(uint32_t format)
+{
+    switch (format)
+    {
+        case data::DXGI_FORMAT_BC1_TYPELESS:
+        case data::DXGI_FORMAT_BC1_UNORM:
+        case data::DXGI_FORMAT_BC1_UNORM_SRGB:
+        case data::DXGI_FORMAT_BC4_TYPELESS:
+        case data::DXGI_FORMAT_BC4_UNORM:
+        case data::DXGI_FORMAT_BC4_SNORM:
+            return 8;
+
+        case data::DXGI_FORMAT_BC2_TYPELESS:
+        case data::DXGI_FORMAT_BC2_UNORM:
+        case data::DXGI_FORMAT_BC2_UNORM_SRGB:
+        case data::DXGI_FORMAT_BC3_TYPELESS:
+        case data::DXGI_FORMAT_BC3_UNORM:
+        case data::DXGI_FORMAT_BC3_UNORM_SRGB:
+        case data::DXGI_FORMAT_BC5_TYPELESS:
+        case data::DXGI_FORMAT_BC5_UNORM:
+        case data::DXGI_FORMAT_BC5_SNORM:
+        case data::DXGI_FORMAT_BC6H_TYPELESS:
+        case data::DXGI_FORMAT_BC6H_UF16:
+        case data::DXGI_FORMAT_BC6H_SF16:
+        case data::DXGI_FORMAT_BC7_TYPELESS:
+        case data::DXGI_FORMAT_BC7_UNORM:
+        case data::DXGI_FORMAT_BC7_UNORM_SRGB:
+            return 16;
+
+        default:
+            break;
+    }
+    return 0;
 }
