@@ -508,20 +508,20 @@ LLDATAIN_PUBLIC void* load_binary(char const *path, size_t *out_buffer_size);
 /// @param data_size The maximum number of bytes to read from the input buffer.
 /// @param out_header Pointer to the structure to populate.
 /// @return true if the file appears to be a valid DDS file.
-LLDATAIN_PUBLIC bool dds_header(void const *data, size_t data_size, dds_header_t *out_header);
+LLDATAIN_PUBLIC bool dds_header(void const *data, size_t data_size, data::dds_header_t *out_header);
 
 /// @summary Reads the extended surface header from a DDS buffer, if present.
 /// @param data The buffer from which the header data should be read.
 /// @param data_size The maximum number of bytes to read from the input buffer.
 /// @param out_header Pointer to the structure to populate.
 /// @return true if the file contains an extended surface header.
-LLDATAIN_PUBLIC bool dds_header_dxt10(void const *data, size_t data_size, dds_header_dxt10_t *out_header);
+LLDATAIN_PUBLIC bool dds_header_dxt10(void const *data, size_t data_size, data::dds_header_dxt10_t *out_header);
 
 /// @summary Determines the DXGI_FORMAT value based on data in DDS headers.
 /// @param header The base surface header of the DDS.
 /// @param header_ex The extended surface header of the DDS, or NULL.
 /// @retur  One of the values of the dxgi_format_e enumeration.
-LLDATAIN_PUBLIC uint32_t dds_format(dds_header_t const *header, dds_header_dxt10_t const *header_ex);
+LLDATAIN_PUBLIC uint32_t dds_format(data::dds_header_t const *header, data::dds_header_dxt10_t const *header_ex);
 
 /// @summary Calculates the correct pitch value for a scanline, based on the
 /// data format and width of the surface. This is necessary because many DDS
@@ -544,26 +544,26 @@ LLDATAIN_PUBLIC bool dds_packed(uint32_t format);
 /// @param header The base surface header of the DDS.
 /// @param header_ex The extended surface header of the DDS, or NULL.
 /// @return true if the DDS describes a cubemap.
-LLDATAIN_PUBLIC bool dds_cubemap(dds_header_t const *header, dds_header_dxt10_t const *header_ex);
+LLDATAIN_PUBLIC bool dds_cubemap(data::dds_header_t const *header, data::dds_header_dxt10_t const *header_ex);
 
 /// @summary Determines if a DDS describes a volume surface.
 /// @param header The base surface header of the DDS.
 /// @param header_ex The extended surface header of the DDS, or NULL.
 /// @return true if the DDS describes a volume.
-LLDATAIN_PUBLIC bool dds_volume(dds_header_t const *header, dds_header_dxt10_t const *header_ex);
+LLDATAIN_PUBLIC bool dds_volume(data::dds_header_t const *header, data::dds_header_dxt10_t const *header_ex);
 
 /// @summary Determines if a DDS describes a surface array. Note that a volume
 /// is not considered to be the same as a surface array.
 /// @param header The base surface header of the DDS.
 /// @param header_ex The extended surface header of the DDS, or NULL.
 /// @return true if the DDS describes a surface array.
-LLDATAIN_PUBLIC bool dds_array(dds_header_t const *header, dds_header_dxt10_t const *header_ex);
+LLDATAIN_PUBLIC bool dds_array(data::dds_header_t const *header, data::dds_header_dxt10_t const *header_ex);
 
 /// @summary Determines if a DDS describes a mipmap chain.
 /// @param header The base surface header of the DDS.
 /// @param header_ex The extended surface header of the DDS, or NULL.
 /// @return true if the DDS describes a mipmap chain.
-LLDATAIN_PUBLIC bool dds_mipmap(dds_header_t const *header, dds_header_dxt10_t const *header_ex);
+LLDATAIN_PUBLIC bool dds_mipmap(data::dds_header_t const *header, data::dds_header_dxt10_t const *header_ex);
 
 /// @summary Calculate the number of bits-per-pixel for a given format. Block-
 /// compressed formats are supported as well.
@@ -580,13 +580,13 @@ LLDATAIN_PUBLIC size_t dds_bytes_per_block(uint32_t format);
 /// @param header The base surface header of the DDS.
 /// @param header_ex The extended surface header of the DDS, or NULL.
 /// @return The number of elements in the surface array, or 1 if the DDS does not describe an array.
-LLDATAIN_PUBLIC size_t dds_array_count(dds_header_t const *header, dds_header_dxt10_t const *header_ex);
+LLDATAIN_PUBLIC size_t dds_array_count(data::dds_header_t const *header, data::dds_header_dxt10_t const *header_ex);
 
 /// @summary Determines the number of levels in the mipmap chain.
 /// @param header The base surface header of the DDS.
 /// @param header_ex The extended surface header of the DDS, or NULL.
 /// @return The number of levels in the mipmap chain, or 1 if the DDS describes the top level only.
-LLDATAIN_PUBLIC size_t dds_level_count(dds_header_t const *header, dds_header_dxt10_t const *header_ex);
+LLDATAIN_PUBLIC size_t dds_level_count(data::dds_header_t const *header, data::dds_header_dxt10_t const *header_ex);
 
 /// @summary Retrieves a description of and pointer to the start of the data for a mipmap level.
 /// @param data The buffer from which the data should be read.
@@ -599,12 +599,12 @@ LLDATAIN_PUBLIC size_t dds_level_count(dds_header_t const *header, dds_header_dx
 /// descriptors to populate with data (or max_levels, whichever is less.)
 /// @param max_levels The maximum number of items to write to out_levels.
 LLDATAIN_PUBLIC bool dds_describe(
-    void const               *data,
-    size_t                    data_size,
-    dds_header_t const       *header,
-    dds_header_dxt10_t const *header_ex,
-    dds_level_desc_t         *out_levels,
-    size_t                    max_levels);
+    void const                     *data,
+    size_t                          data_size,
+    data::dds_header_t const       *header,
+    data::dds_header_dxt10_t const *header_ex,
+    data::dds_level_desc_t         *out_levels,
+    size_t                          max_levels);
 
 /// @summary Generates a little-endian FOURCC.
 /// @param a...d The four characters comprising the code.
