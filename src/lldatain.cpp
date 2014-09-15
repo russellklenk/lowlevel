@@ -1200,7 +1200,7 @@ size_t data::dds_level_count(data::dds_header_t const *header, data::dds_header_
 {
     if (data::dds_mipmap(header, header_ex))
     {
-        return header->Levels + 1;
+        return header->Levels;
     }
     else if (header) return 1;
     else return 0;
@@ -1279,7 +1279,6 @@ size_t data::wav_describe(
     data::wave_data_t   *out_clips,
     size_t               max_clips)
 {
-    data::riff_chunk_header_t   *dc = NULL;
     data::wave_format_t *fmt        = NULL;
     data::riff_header_t *riff       = NULL;
     uint8_t const       *format_ptr = NULL;
@@ -1289,7 +1288,6 @@ size_t data::wav_describe(
     uint8_t const       *end_ptr    = (uint8_t const*) data + data_size;
     size_t               min_size   = 0;
     size_t               clip_index = 0;
-    float                duration   = 0.0f;
 
     min_size  = sizeof(data::riff_header_t);
     min_size += sizeof(data::riff_chunk_header_t) * 2;
