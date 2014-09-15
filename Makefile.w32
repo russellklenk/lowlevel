@@ -9,10 +9,17 @@ LIBRARY_DIRS  = -Llib
 PROJ_WARNINGS = -Wall -Wextra
 PROJ_CCFLAGS  = -std=gnu++0x -O3 -fstrict-aliasing -D __STDC_FORMAT_MACROS -DLLOPENGL_USE_GLEW
 PROJ_LDFLAGS  =
+TEST_TARGETS  = test/dds_info.exe
+TEST_SOURCES  = $(wildcard test/*.cpp)
+TEST_OBJECTS  = ${TEST_SOURCES:.cpp=.o}
+TEST_DEPS     = ${TEST_SOURCES:.cpp=.dep}
+TEST_CCFLAGS  = -std=gnu++0x -O3 -fstrict-aliasing -D __STDC_FORMAT_MACROS -DLLOPENGL_USE_GLEW
+TEST_LDFLAGS  = -Llib
+TEST_LIBRARIES= -lstdc++ -lm -lll
 
-.PHONY: all clean distclean output
+.PHONY: all clean distclean output tests
 
-all:: ${TARGET}
+all:: ${TARGET} ${TEST_TARGETS}
 
 ${TARGET}: ${OBJECTS}
 	ar rcs $@ $^
@@ -25,8 +32,19 @@ ${DEPENDENCIES}: %.dep: %.cpp ${HEADERS} Makefile.w32
 
 output:: ${TARGET}
 
+${TEST_TARGETS}: ${TEST_OBJECTS}
+	${CC} ${LDFLAGS} ${TEST_LDFLAGS} -o $@ $^ ${TEST_LIBRARIES}
+
+${TEST_OBJECTS}: %.o: %.cpp ${TEST_DEPS}
+	${CC} ${INCLUDE_DIRS} ${CCFLAGS} ${TEST_CCFLAGS} -o $@ -c $<
+
+${TEST_DEPS}: %.dep: %.cpp ${HEADERS} Makefile.w32
+	${CC} ${INCLUDE_DIRS} ${CCFLAGS} ${TEST_CCFLAGS} -MM $< > $@
+
+tests:: ${TARGET} ${TEST_TARGETS}
+
 clean::
-	rm -f *~ *.o *.dep src/*~ src/*.o src/*.dep ${TARGET}
+	rm -f *~ *.o *.dep src/*~ src/*.o src/*.dep test/*~ test/*.o test/*.dep ${TARGET} ${TEST_TARGETS}
 
 distclean:: clean
 
