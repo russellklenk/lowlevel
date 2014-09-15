@@ -19,7 +19,7 @@
 //   Constants   //
 /////////////////*/
 /// @summary Abstract platform differences for standard buffered file I/O.
-#ifdef _MSC_VER
+#if defined(_WIN32) || defined(_WIN64)
     #define STAT64_STRUCT struct __stat64
     #define STAT64_FUNC   _stat64
     #define FTELLO_FUNC   _ftelli64
@@ -29,7 +29,7 @@
     #define STAT64_FUNC   stat
     #define FTELLO_FUNC   ftello
     #define FSEEKO_FUNC   fseeko
-#endif /* defined(_MSC_VER) */
+#endif
 
 /// @summary A string defining the valid characters in a base-64 encoding.
 /// This table is used when encoding binary data to base-64.
