@@ -156,6 +156,28 @@ static inline size_t image_dimension(uint32_t format, size_t dimension)
     else return max2<size_t>(1, dimension);
 }
 
+/// @summary Locate a specific RIFF chunk within the file data.
+/// @param start The starting point of the search. This address should be the
+/// start of a RIFF chunk header.
+/// @param end The pointer representing the end of the file or search space.
+/// @param id The chunk identifier to search for.
+/// @return A pointer to the start of the chunk header, or NULL.
+static uint8_t const* find_chunk(void const *start, void const *end, uint32_t id)
+{
+    size_t const  hsize = sizeof(data::riff_chunk_header_t);
+    uint8_t const *iter = (uint8_t const*) start;
+    while (iter < end)
+    {
+        data::riff_chunk_header_t const *head = (data::riff_chunk_header_t const*) iter;
+        if (head->ChunkId == id)
+            return iter;
+
+        iter += hsize + head->DataSize; // move to the next chunk start
+        if (size_t(iter) & 1) iter++;   // chunks start on an even address
+    }
+    return NULL;
+}
+
 /*////////////////////////
 //   Public Functions   //
 ////////////////////////*/
@@ -1173,7 +1195,7 @@ size_t data::dds_level_count(data::dds_header_t const *header, data::dds_header_
     else return 0;
 }
 
-bool data::dds_describe(
+size_t data::dds_describe(
     void                     const *data,
     size_t                          data_size,
     data::dds_header_t       const *header,
@@ -1215,7 +1237,7 @@ bool data::dds_describe(
     if (header_ex) offset += sizeof(data::dds_header_dxt10_t);
     for (size_t i = 0; i < nitems && dst_i < max_levels; ++i)
     {
-        for (size_t j = 0; j < nlevels && dst_i < max_levels; ++j)
+        for (size_t j = 0; j < nlevels && dst_i < max_levels && offset < data_size; ++j)
         {
             data::dds_level_desc_t &dst = out_levels[dst_i++];
             size_t levelw        = level_dimension(basew , j);
@@ -1236,5 +1258,89 @@ bool data::dds_describe(
             offset              += dst.DataSize;
         }
     }
-    return (offset <= data_size);
+    return dst_i;
+}
+
+size_t data::wav_describe(
+    void const          *data,
+    size_t               data_size,
+    data::wave_format_t *out_desc,
+    data::wave_data_t   *out_clips,
+    size_t               max_clips)
+{
+    data::riff_chunk_header_t   *dc = NULL;
+    data::wave_format_t *fmt        = NULL;
+    data::riff_header_t *riff       = NULL;
+    uint8_t const       *format_ptr = NULL;
+    uint8_t const       *search_ptr = NULL;
+    uint8_t const       *data_ptr   = NULL;
+    uint8_t const       *base_ptr   = (uint8_t const*) data;
+    uint8_t const       *end_ptr    = (uint8_t const*) data + data_size;
+    size_t               min_size   = 0;
+    size_t               clip_index = 0;
+    float                duration   = 0.0f;
+
+    min_size  = sizeof(data::riff_header_t);
+    min_size += sizeof(data::riff_chunk_header_t) * 2;
+    min_size += sizeof(data::wave_format_t);
+    if (data == NULL || data_size < min_size)
+        goto wave_error;
+
+    riff = (data::riff_header_t*) base_ptr;
+    if (riff->ChunkId  != data::fourcc_le('R','I','F','F'))
+        goto wave_error;
+    if (riff->RiffType != data::fourcc_le('W','A','V','E'))
+        goto wave_error;
+
+    search_ptr = base_ptr + sizeof(data::riff_header_t);
+    format_ptr = find_chunk(search_ptr, end_ptr, data::fourcc_le('f','m','t',' '));
+    if (format_ptr == NULL)
+        goto wave_error;
+
+    fmt = (data::wave_format_t*)  (format_ptr + sizeof(data::riff_chunk_header_t));
+    if (fmt->CompressionType != data::WAVE_COMPRESSION_PCM)
+        goto wave_unsupported;
+
+    if (max_clips == 0)
+    {
+        // the caller didn't request any clip information.
+        if (out_desc) *out_desc = *fmt;
+        return 0;
+    }
+
+    // return information about any data clips we find, up to max_clips or EOF.
+    data_ptr = format_ptr;
+    while (data_ptr != NULL && data_ptr < end_ptr && clip_index < max_clips)
+    {
+        data_ptr = find_chunk(data_ptr, end_ptr, data::fourcc_le('d','a','t','a'));
+        if (data_ptr)
+        {
+            data::riff_header_t *data_hdr = (data::riff_header_t*) data_ptr;
+            data::wave_data_t   &clip     = out_clips[clip_index++];
+            clip.DataSize     =  data_hdr->DataSize;
+            clip.SampleCount  =  data_hdr->DataSize / (fmt->ChannelCount * (fmt->BitsPerSample / 8));
+            clip.SampleData   = (void*)(data_ptr + sizeof(data::riff_header_t));
+            clip.Duration     =  float (data_hdr->DataSize) / float(fmt->ChannelCount * (fmt->BitsPerSample / 8) * fmt->SampleRate);
+        }
+    }
+    if (out_desc) *out_desc = *fmt;
+    return clip_index;
+
+wave_error:
+    if (out_desc)
+    {
+        out_desc->CompressionType = data::WAVE_COMPRESSION_UNKNOWN;
+        out_desc->ChannelCount    = 0;
+        out_desc->SampleRate      = 0;
+        out_desc->BytesPerSecond  = 0;
+        out_desc->BlockAlignment  = 0;
+        out_desc->BitsPerSample   = 0;
+        out_desc->FormatDataSize  = 0;
+        out_desc->FormatData[0]   = 0;
+    }
+    return 0;
+
+wave_unsupported:
+    if (out_desc) *out_desc = *fmt;
+    return 0;
 }

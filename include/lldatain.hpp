@@ -341,6 +341,16 @@ enum dds_alpha_mode_e
     DDS_ALPHA_MODE_CUSTOM                   = 0x00000004U
 };
 
+/// @summary Defines the recognized compression types.
+enum wav_compression_type_e
+{
+    WAVE_COMPRESSION_UNKNOWN                = 0x0000,
+    WAVE_COMPRESSION_PCM                    = 0x0001,
+    WAVE_COMPRESSION_ADPCM                  = 0x0002,
+    WAVE_COMPRESSION_MPEG                   = 0x0050,
+    WAVE_COMPRESISON_EXPERIMENTAL           = 0xFFFF
+};
+
 /// @summary The equivalent of the DDS_PIXELFORMAT structure. See MSDN at:
 /// http://msdn.microsoft.com/en-us/library/windows/desktop/bb943984(v=vs.85).aspx
 #pragma pack(push, 1)
@@ -406,6 +416,50 @@ struct dds_level_desc_t
     size_t   DataSize;        /// The total size of the data for the level, in bytes.
     void    *LevelData;       /// Pointer to the start of the level data.
     uint32_t Format;          /// One of dxgi_format_e.
+};
+
+/// @summary Define the RIFF header that appears at the start of a WAVE file.
+#pragma pack(push, 1)
+struct riff_header_t
+{
+    uint32_t ChunkId;         /// 'RIFF' (0x52494646)
+    uint32_t DataSize;        /// The file size, minus 8 (for the header).
+    uint32_t RiffType;        /// The file type, 'WAVE' (0x57415645)
+};
+#pragma pack(pop)
+
+/// @summary Define the header that appears at the start of each RIFF chunk.
+/// Note that chunk headers start on even addresses only.
+#pragma pack(push, 1)
+struct riff_chunk_header_t
+{
+    uint32_t ChunkId;         /// Varies; 'fmt ' (0x666D7420) and 'data' (0x64617461)
+    uint32_t DataSize;        /// The size of the chunk data, not including the header.
+};
+#pragma pack(pop)
+
+/// @summary Define the data comprising the WAV format chunk, used to describe sample data.
+#pragma pack(push, 1)
+struct wave_format_t
+{
+    uint16_t CompressionType; /// One of wav_compression_type_e.
+    uint16_t ChannelCount;    /// Number of channels (1 = mono, 2 = stereo).
+    uint32_t SampleRate;      /// Number of samples per-second.
+    uint32_t BytesPerSecond;  /// Average number of bytes per-second for streaming.
+    uint16_t BlockAlignment;  /// Number of bytes per-sample.
+    uint16_t BitsPerSample;   /// Number of bytes per-sample.
+    uint16_t FormatDataSize;  /// Size of the format-specific data, in bytes.
+    uint8_t  FormatData[1];   /// Optional extra format-specific data.
+};
+#pragma pack(pop)
+
+/// @summary Describes a chunk containing uncompressed PCM sample data.
+struct wave_data_t
+{
+    size_t   DataSize;        /// The size of the sample data, in bytes.
+    size_t   SampleCount;     /// The number of samples in the clip.
+    void    *SampleData;      /// Pointer to the start of the clip sample data.
+    float    Duration;        /// The clip duration, in seconds.
 };
 
 /*////////////////
@@ -593,18 +647,32 @@ LLDATAIN_PUBLIC size_t dds_level_count(data::dds_header_t const *header, data::d
 /// @param data_size The maximum number of bytes to read from the input buffer.
 /// @param header The base surface header of the DDS.
 /// @param header_ex The extended surface header of the DDS, or NULL.
-/// @param array_index The zero-based index of the array element to read, or 0.
-/// @param level_index The zero-based index of the mipmap level to describe, or 0.
 /// @param out_levels A buffer of dds_array_count() * dds_level_count() level
 /// descriptors to populate with data (or max_levels, whichever is less.)
 /// @param max_levels The maximum number of items to write to out_levels.
-LLDATAIN_PUBLIC bool dds_describe(
-    void const                     *data,
+/// @return The number of level descriptors written to out_levels.
+LLDATAIN_PUBLIC size_t dds_describe(
+    void                     const *data,
     size_t                          data_size,
-    data::dds_header_t const       *header,
+    data::dds_header_t       const *header,
     data::dds_header_dxt10_t const *header_ex,
     data::dds_level_desc_t         *out_levels,
     size_t                          max_levels);
+
+/// @summary Describes the format of uncompressed PCM sound data stored in a
+/// RIFF WAVE container. Compressed audio is not supported.
+/// @param data The buffer from which data should be read.
+/// @param data_size The maximum number of bytes to read from the input buffer.
+/// @param out_desc Pointer to a structure to populate with sound format information.
+/// @param out_clips An array of clip descriptors to populate.
+/// @param max_clips The maximum number of clip descriptors to write to out_clips.
+/// @return The number of clip descriptors written to out_clips.
+LLDATAIN_PUBLIC size_t wav_describe(
+    void const          *data,
+    size_t               data_size,
+    data::wave_format_t *out_desc,
+    data::wave_data_t   *out_clips,
+    size_t               max_clips);
 
 /// @summary Generates a little-endian FOURCC.
 /// @param a...d The four characters comprising the code.
