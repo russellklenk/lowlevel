@@ -1766,10 +1766,10 @@ void gl::generate_quads(
         gl::sprite_sort_data_t &r = sdata[qindex];
         gl::sprite_quad_t      &q = quads[qindex];
 
-        q.Source[0]   = s.ImageX;
-        q.Source[1]   = s.ImageY;
-        q.Source[2]   = s.ImageWidth;
-        q.Source[3]   = s.ImageHeight;
+        q.Source[0]   = float(s.ImageX);
+        q.Source[1]   = float(s.ImageY);
+        q.Source[2]   = float(s.ImageWidth);
+        q.Source[3]   = float(s.ImageHeight);
         q.Target[0]   = s.ScreenX;
         q.Target[1]   = s.ScreenY;
         q.Target[2]   = s.ImageWidth  * s.ScaleX;
