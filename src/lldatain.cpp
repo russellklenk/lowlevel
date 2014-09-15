@@ -20,15 +20,26 @@
 /////////////////*/
 /// @summary Abstract platform differences for standard buffered file I/O.
 #if defined(_WIN32) || defined(_WIN64)
+    #ifdef _MSC_VER
     #define STAT64_STRUCT struct __stat64
     #define STAT64_FUNC   _stat64
     #define FTELLO_FUNC   _ftelli64
     #define FSEEKO_FUNC   _fseeki64
+    #define FPOS_TYPE     int64_t
+    #endif
+    #ifdef __GNUC__
+    #define STAT64_STRUCT struct stat
+    #define STAT64_FUNC   stat
+    #define FTELLO_FUNC   ftell
+    #define FSEEKO_FUNC   fseek
+    #define FPOS_TYPE     long
+    #endif
 #else
     #define STAT64_STRUCT struct stat
     #define STAT64_FUNC   stat
     #define FTELLO_FUNC   ftello
     #define FSEEKO_FUNC   fseeko
+    #define FPOS_TYPE     int64_t
 #endif
 
 /// @summary A string defining the valid characters in a base-64 encoding.
@@ -91,9 +102,9 @@ static signed char const Base64_Indices[] =
 /// @return The size of the file, in bytes.
 static uint64_t file_size(FILE *file)
 {
-    int64_t curr  = FTELLO_FUNC(file);
+    FPOS_TYPE curr = FTELLO_FUNC(file);
     FSEEKO_FUNC(file, 0,    SEEK_END);
-    int64_t endp  = FTELLO_FUNC(file);
+    FPOS_TYPE endp = FTELLO_FUNC(file);
     FSEEKO_FUNC(file, curr, SEEK_SET);
     return uint64_t(endp);
 }
