@@ -13,6 +13,12 @@
 #include <stdlib.h>
 #include "llopenal.hpp"
 
+#ifdef _MSC_VER
+#define STRDUP    _strdup
+#else
+#define STRDUP    strdup
+#endif
+
 /*/////////////////
 //   Constants   //
 /////////////////*/
@@ -33,12 +39,12 @@ static char* al_device_str(ALCdevice *dev, ALenum param)
     if (value != NULL)
     {
         // return a copy of the driver string.
-        return strdup(value);
+        return STRDUP(value);
     }
     else
     {
         char *str = (char*) malloc(1);
-        str[0]    = '\0';
+        str[0] = '\0';
         return str;
     }
 }
