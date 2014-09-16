@@ -15,7 +15,7 @@ TEST_OBJECTS  = ${TEST_SOURCES:.cpp=.o}
 TEST_DEPS     = ${TEST_SOURCES:.cpp=.dep}
 TEST_CCFLAGS  = -ggdb -std=c++0x -O3 -fstrict-aliasing -D __STDC_FORMAT_MACROS -DLLOPENGL_USE_GLEW
 TEST_LDFLAGS  = -Llib
-TEST_LIBRARIES= -lstdc++ -lm -lll -framework Cocoa -framework OpenGL -frameword OpenCL -framework OpenAL
+TEST_LIBRARIES= -lstdc++ -lm -lll -framework Cocoa -framework OpenGL -framework OpenCL -framework OpenAL
 
 .PHONY: all clean distclean output tests
 

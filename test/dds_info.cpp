@@ -663,7 +663,7 @@ static void print_ddpf(FILE *fp, data::dds_pixelformat_t const *ddpf)
         {
             if ((n != 0))
                 fprintf(fp, " | ");
-            fprintf(fp, ddpf_str(DDPF_FLAGS[i]));
+            fprintf(fp, "%s", ddpf_str(DDPF_FLAGS[i]));
             n++;
         }
     }
@@ -688,7 +688,7 @@ static void print_header(FILE *fp, data::dds_header_t const *head)
         {
             if ((n != 0))
                 fprintf(fp, " | ");
-            fprintf(fp, ddsd_str(DDSD_FLAGS[i]));
+            fprintf(fp, "%s", ddsd_str(DDSD_FLAGS[i]));
             n++;
         }
     }
@@ -706,7 +706,7 @@ static void print_header(FILE *fp, data::dds_header_t const *head)
         {
             if ((n != 0))
                 fprintf(fp, " | ");
-            fprintf(fp, dds_caps_str(DDSCAPS_FLAGS[i]));
+            fprintf(fp, "%s", dds_caps_str(DDSCAPS_FLAGS[i]));
             n++;
         }
     }
@@ -718,7 +718,7 @@ static void print_header(FILE *fp, data::dds_header_t const *head)
         {
             if ((n != 0))
                 fprintf(fp, " | ");
-            fprintf(fp, dds_caps2_str(DDSCAPS2_FLAGS[i]));
+            fprintf(fp, "%s", dds_caps2_str(DDSCAPS2_FLAGS[i]));
             n++;
         }
     }
@@ -730,7 +730,7 @@ static void print_header(FILE *fp, data::dds_header_t const *head)
         {
             if ((n != 0))
                 fprintf(fp, " | ");
-            fprintf(fp, dds_caps3_str(DDSCAPS3_FLAGS[i]));
+            fprintf(fp, "%s", dds_caps3_str(DDSCAPS3_FLAGS[i]));
             n++;
         }
     }
@@ -742,7 +742,7 @@ static void print_header(FILE *fp, data::dds_header_t const *head)
         {
             if ((n != 0))
                 fprintf(fp, " | ");
-            fprintf(fp, dds_caps4_str(DDSCAPS4_FLAGS[i]));
+            fprintf(fp, "%s", dds_caps4_str(DDSCAPS4_FLAGS[i]));
             n++;
         }
     }
@@ -770,7 +770,7 @@ static void print_header_ex(FILE *fp, data::dds_header_dxt10_t const *head)
         {
             if ((n != 0))
                 fprintf(fp, " | ");
-            fprintf(fp, d3d11_resource_misc_flag_str(RESOURCE_MISC_FLAG[i]));
+            fprintf(fp, "%s", d3d11_resource_misc_flag_str(RESOURCE_MISC_FLAG[i]));
             n++;
         }
     }
@@ -783,7 +783,7 @@ static void print_header_ex(FILE *fp, data::dds_header_dxt10_t const *head)
         {
             if ((n != 0))
                 fprintf(fp, " | ");
-            fprintf(fp, alpha_mode_str(ALPHA_MODE[i]));
+            fprintf(fp, "%s", alpha_mode_str(ALPHA_MODE[i]));
             n++;
         }
     }
