@@ -91,6 +91,37 @@ enum text_encoding_e
     TEXT_ENCODING_FORCE_32BIT   = 0x7FFFFFFFL
 };
 
+/// @summary An enumeration defining the types of JSON nodes that can be stored
+/// within a JSON document. The type is stored as a 4-byte field.
+enum json_item_type_e
+{
+    /// The node contains a value of unknown type. This typically indicates
+    /// an error, as all nodes should have associated types.
+    JSON_TYPE_UNKNOWN           = 0,
+    /// The node contains an object. Objects typically have children that
+    /// define their fields as key-value pairs.
+    JSON_TYPE_OBJECT            = 1,
+    /// The node represents an array. The array items are stored in the linked
+    /// list of siblings of the first child node.
+    JSON_TYPE_ARRAY             = 2,
+    /// The node represents a string field. The string is a pointer into the
+    /// JSON document buffer, and is guaranteed to be NULL-terminated.
+    JSON_TYPE_STRING            = 3,
+    /// The node represents an integer field. Integer fields are stored as
+    /// 64-bit signed values, and must be specified using either decimal or hex.
+    JSON_TYPE_INTEGER           = 4,
+    /// The node represents a floating-point field. Number fields are stored
+    /// as a 64-bit IEEE double-precision value.
+    JSON_TYPE_NUMBER            = 5,
+    /// The node represents a boolean field, with a value of either true or false.
+    JSON_TYPE_BOOLEAN           = 6,
+    /// The node represents a NULL value, as indicated by the constant 'null' or 'NULL'.
+    JSON_TYPE_NULL              = 7,
+    /// This type value is unused and serves only to force a minimum of 32-bits
+    /// of storage space for values of this enumeration type.
+    JSON_TYPE_FORCE_32BIT       = 0x7FFFFFFFL
+};
+
 /// @summary Bitflags for dds_pixelformat_t::Flags. See MSDN documentation at:
 /// http://msdn.microsoft.com/en-us/library/windows/desktop/bb943984(v=vs.85).aspx
 /// for the DDS_PIXELFORMAT structure.
@@ -462,6 +493,59 @@ struct wave_data_t
     float    Duration;        /// The clip duration, in seconds.
 };
 
+/// @summary Describes an error that was encountered while parsing a JSON document.
+struct json_error_t
+{
+    char const  *Description; /// A brief error description. Do not free this string.
+    char const  *Position;    /// A pointer to the error position within the document.
+    size_t       Line;        /// The line number within the document.
+};
+
+/// @summary Represents a single item or key-value pair within a JSON document.
+/// Specific values for strings, integers, numbers and booleans can be read
+/// using their own parsing functions. Note that any strings point into the
+/// document buffer directly, and do not need to be freed separately.
+struct json_item_t
+{
+    json_item_t *Parent;      /// A pointer to the parent node, or NULL.
+    json_item_t *Next;        /// A pointer to the next sibling node, or NULL.
+    json_item_t *FirstChild;  /// A pointer to the first child node, or NULL.
+    json_item_t *LastChild;   /// A pointer to the last child node, or NULL.
+    char        *Key;         /// NULL-terminated string field name.
+    int32_t      ValueType;   /// One of json_item_type_e.
+    union        ValueUnion
+    {
+        char    *string;      /// NULL-terminated string value; ValueType = JSON_TYPE_STRING.
+        int64_t  integer;     /// Signed 64-bit integer value;  ValueType = JSON_TYPE_INTEGER.
+        double   number;      /// Floating-point value; ValueType = JSON_TYPE_NUMBER.
+        bool     boolean;     /// Boolean value; ValueType = JSON_TYPE_BOOLEAN.
+    }            Value;       /// The item value. Objects/Arrays look at FirstChild.
+};
+
+/// @summary Function signature for a user-defined function that allocates a new
+/// JSON item node. Note that nodes are always a fixed size, sizeof(json_item_t).
+/// @param size_in_bytes The number of bytes to allocate. Always sizeof(json_item_t).
+/// @param context Opaque data associated with the allocator. May be NULL.
+/// @return The newly allocated item record, or NULL.
+typedef json_item_t* (LLDATAIN_CALL_C *json_alloc_fn)(size_t size_in_bytes, void *context);
+
+/// @summary Function signature for a user-defined function that releases memory
+/// allocated for a JSON document node. Note that nodes are always a fixed size,
+/// sizeof(json_item_t). The function can release the memory, return to free pool, etc.
+/// @param item The document node to free.
+/// @param size_in_bytes The number of bytes allocated to the node. Always sizeof(json_item_t).
+/// @param context Opaque data associated with the allocator. May be NULL.
+typedef void (LLDATAIN_CALL_C *json_free_fn)(json_item_t *item, size_t size_in_bytes, void *context);
+
+/// @summary Describes a custom allocator for JSON document nodes. Use of a
+/// custom allocator is option. The default implementation uses malloc()/free().
+struct json_allocator_t
+{
+    json_alloc_fn Allocate;   /// The callback used to allocate a document node.
+    json_free_fn  Release;    /// The callback used to free a document node.
+    void         *Context;    /// Opaque data associated with the allocator.
+};
+
 /*////////////////
 //   Functions  //
 ////////////////*/
@@ -673,6 +757,81 @@ LLDATAIN_PUBLIC size_t wav_describe(
     data::wave_format_t *out_desc,
     data::wave_data_t   *out_clips,
     size_t               max_clips);
+
+/// @summary Parses a string value representing a signed 64-bit base-10 integer.
+/// @param first Pointer to the first character to inspect.
+/// @param last Pointer to the last character to inspect.
+/// @param out On return, this location is updated with the parsed value.
+/// @return A pointer to the end of the value, or first if the number could not be parsed.
+LLDATAIN_PUBLIC char* str_to_dec_s64(char *first, char *last, int64_t *out);
+
+/// @summary Parses a string value representing a unsigned 32-bit base-16 integer.
+/// @param first Pointer to the first character to inspect.
+/// @param last Pointer to the last character to inspect.
+/// @param out On return, this location is updated with the parsed value.
+/// @return A pointer to the end of the value, or first if the number could not be parsed.
+LLDATAIN_PUBLIC char* str_to_hex_u32(char *first, char *last, uint32_t *out);
+
+/// @summary Parses a string value representing a unsigned 64-bit base-16 integer.
+/// @param first Pointer to the first character to inspect.
+/// @param last Pointer to the last character to inspect.
+/// @param out On return, this location is updated with the parsed value.
+/// @return A pointer to the end of the value, or first if the number could not be parsed.
+LLDATAIN_PUBLIC char* str_to_hex_u64(char *first, char *last, uint64_t *out);
+
+/// @summary Parses a string value representing a decimal value.
+/// @param first Pointer to the first character to inspect.
+/// @param last Pointer to the last character to inspect.
+/// @param out On return, this location is updated with the parsed value.
+/// @return A pointer to the end of the value, or first if the number could not be parsed.
+LLDATAIN_PUBLIC char* str_to_num_f64(char *first, char *last, double *out);
+
+/// @summary Initializes a JSON allocator instance.
+/// @param allocator The allocator to initialize.
+/// @param alloc_func The callback used to allocate a JSON document node. Required.
+/// @param free_func The callback used to release the memory allocated to a JSON
+/// document node. Optional. Defaults to a no-op if not specified.
+/// @param context Opaque data associated with the allocator implementation. Optional.
+LLDATAIN_PUBLIC void json_allocator_init(
+    data::json_allocator_t *allocator,
+    data::json_alloc_fn     alloc_func,
+    data::json_free_fn      free_func,
+    void                   *context);
+
+/// @summary Initializes a JSON document node instance.
+/// @param item The document node to initialize.
+LLDATAIN_PUBLIC void json_item_init(data::json_item_t *item);
+
+/// @summary Inserts a single item into a JSON document tree. This is a utility
+/// function that can be used to manually construct a JSON document.
+/// @param parent The parent item, or NULL if new_node is the document root.
+/// @param new_node The new child node.
+LLDATAIN_PUBLIC void json_document_append(data::json_item_t *parent, data::json_item_t *new_node);
+
+/// @summary Performs in-place parsing and validation of a JSON document. Note
+/// that string keys and values in the generated document nodes are pointers
+/// directly into the document buffer. This function modifies the contents of
+/// the document buffer by overwriting data with zero bytes for string termination.
+/// @param document The buffer containing the JSON document.
+/// @param document_size The size of the input document buffer, in bytes.
+/// @param allocator The custom memory allocator implementation to use for creating
+/// JSON document nodes. Pass NULL to use the default malloc() and free().
+/// @param out_root On return, this location points to the root node of the JSON
+/// document. If an error occurs, this location points to NULL.
+/// @param out_error If the function returns false, this location is updated with
+/// a details about the error that was encountered.
+/// @return true if the document was parsed successfully.
+LLDATAIN_PUBLIC bool json_parse(
+    char                   *document,
+    size_t                  document_size,
+    data::json_allocator_t *allocator,
+    data::json_item_t     **out_root,
+    data::json_error_t     *out_error);
+
+/// @summary Releases the memory associated with each node in the JSON document.
+/// @param item The JSON document node to free. Pass the root node to free the entire document tree.
+/// @param allocator The same allocator implementation passed to json_parse().
+LLDATAIN_PUBLIC void json_free(data::json_item_t *item, data::json_allocator_t *allocator);
 
 /// @summary Generates a little-endian FOURCC.
 /// @param a...d The four characters comprising the code.

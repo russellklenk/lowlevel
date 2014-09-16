@@ -42,6 +42,24 @@
     #define FPOS_TYPE     int64_t
 #endif
 
+/// @summary Boilerplate to populate a JSON error description and clean up.
+#define JSON_ERROR(it, desc, err)                                             \
+    if (err != NULL)                                                          \
+    {                                                                         \
+        err->Description = (char*) desc;                                      \
+        err->Position    = it;                                                \
+        err->Line        = 1   - escaped_newlines;                            \
+        for (char *c = it; c  != document; --c)                               \
+        {                                                                     \
+            if (*c == '\n') err->Line += 1;                                   \
+        }                                                                     \
+    }                                                                         \
+    if (root != NULL)                                                         \
+    {                                                                         \
+        data::json_free(root, allocator);                                     \
+    }                                                                         \
+    return false
+
 /// @summary A string defining the valid characters in a base-64 encoding.
 /// This table is used when encoding binary data to base-64.
 static char const        Base64_Chars[]   =
@@ -188,6 +206,161 @@ static uint8_t const* find_chunk(void const *start, void const *end, uint32_t id
     }
     return NULL;
 }
+
+/// @summary Determines if a character represents a decimal digit.
+/// @param ch The input character.
+/// @return true if ch is any of '0', '1', '2', '3', '4', '5', '6', '7', '8' or '9'.
+static inline bool is_digit(char ch)
+{
+    return (ch >= '0' && ch <= '9');
+}
+
+/// @summary JSON document node allocator based on malloc.
+/// @param size_in_bytes The number of bytes to allocate. Always sizeof(json_item_t).
+/// @param context Opaque data associated with the allocator. May be NULL.
+/// @return The newly allocated item record, or NULL.
+static data::json_item_t* LLDATAIN_CALL_C libc_alloc(size_t size_in_bytes, void * /*context*/)
+{
+    return (data::json_item_t*) malloc(size_in_bytes);
+}
+
+/// @summary JSON document node allocator based on malloc/free.
+/// @param item The document node to free.
+/// @param size_in_bytes The number of bytes allocated to the node. Always sizeof(json_item_t).
+/// @param context Opaque data associated with the allocator. May be NULL.
+static void LLDATAIN_CALL_C libc_free(data::json_item_t *item, size_t /*size_in_bytes*/, void * /* context */)
+{
+    if (item) free(item);
+}
+
+/// @summary JSON document node allocator no-op free. This is used when you
+/// pass NULL as the free_func parameter to json_allocator_init().
+/// @param item The document node to free.
+/// @param size_in_bytes The number of bytes allocated to the node. Always sizeof(json_item_t).
+/// @param context Opaque data associated with the allocator. May be NULL.
+static void LLDATAIN_CALL_C noop_free(data::json_item_t * /*item*/, size_t /*size_in_bytes*/, void * /* context */)
+{
+    /* empty */
+}
+
+/// @summary Perform fixup on a JSON document node allocator to prevent constant NULL-checking.
+/// @param allocator The allocator instance to fixup.
+static void fixup_allocator(data::json_allocator_t *allocator)
+{
+    if (allocator->Allocate == NULL && allocator->Release == NULL)
+    {
+        // fall back to libc malloc/free.
+        allocator->Allocate  = libc_alloc;
+        allocator->Release   = libc_free;
+    }
+    if (allocator->Allocate != NULL && allocator->Release == NULL)
+    {
+        // use a no-op release.
+        allocator->Release   = noop_free;
+    }
+}
+
+/// @summary Allocate and initialize a JSON document node.
+/// @param a The allocator implementation to use.
+/// @return A pointer to the document node, or NULL.
+static inline data::json_item_t* json_alloc(data::json_allocator_t *a)
+{
+    data::json_item_t   *node = a->Allocate(sizeof(data::json_item_t), a->Context);
+    data::json_item_init(node);
+    return node;
+}
+
+/// @summary Free or release a JSON document node.
+/// @param node The document node to free.
+/// @param a The allocator implementation used to allocate the node.
+static inline void json_free(data::json_item_t *node, data::json_allocator_t *a)
+{
+    if (node) a->Release(node, sizeof(data::json_item_t), a->Context);
+}
+
+#if 0
+/// @summary Indents a given number of tabs, with a tab size of 2 spaces.
+/// @param fp The output file stream.
+/// @param tab_count The number of tab levels to indent.
+static void json_indent(FILE *fp, size_t tab_count)
+{
+    for (size_t i = 0; i < tab_count; ++i)
+    {
+        fprintf(fp, "  ");
+    }
+}
+
+/// @summary Pretty-print a JSON document tree.
+/// @param fp The output file stream.
+/// @param node The node to write to fp.
+/// @param indent_level The number of tab levels to indent the output.
+static void json_print(FILE *fp, data::json_item_t *node, size_t indent_level)
+{
+    if (NULL == node) return;
+    json_indent(fp, indent_level);
+    if (node->key != NULL) fprintf(fp, "\"%s\" : ", node->key);
+    switch (node->value_type)
+    {
+        case data::JSON_TYPE_OBJECT:
+            {
+                fprintf(fp, "\n");
+                json_indent(fp, indent_level);
+                fprintf(fp, "{\n");
+                data::json_item_t *item_iter = node->FirstChild;
+                while (item_iter != NULL)
+                {
+                    json_print(fp, item_iter, indent_level + 1);
+                    if (item_iter->Next != NULL) fprintf(fp, ",\n");
+                    else fprintf(fp, " \n");
+                    item_iter = item_iter->Next;
+                }
+                json_indent(fp, indent_level);
+                fprintf(fp, "}");
+            }
+            break;
+
+        case data::JSON_TYPE_ARRAY:
+            {
+                fprintf(fp, "\n");
+                json_indent(fp, indent_level);
+                fprintf(fp, "[\n");
+                data::json_item_t *item_iter = node->FirstChild;
+                while (item_iter != NULL)
+                {
+                    json_print(fp, item_iter, indent_level + 1);
+                    if (item_iter->Next != NULL) fprintf(fp, ",\n");
+                    else fprintf(fp, " \n");
+                    item_iter = item_iter->Next;
+                }
+                json_indent(fp, indent_level);
+                fprintf(fp, "]\n");
+            }
+            break;
+
+        case data::JSON_TYPE_STRING:
+            fprintf(fp, "\"%s\"", node->Value.string);
+            break;
+
+        case data::JSON_TYPE_INTEGER:
+            // @note: #define __STDC_FORMAT_MACROS
+            // @note: #include <inttypes.h>
+            // fprintf(fp, "%"PRIu64, node->Value.integer);
+            break;
+
+        case data::JSON_TYPE_NUMBER:
+            fprintf(fp, "%f", node->Value.number);
+            break;
+
+        case data::JSON_TYPE_BOOLEAN:
+            fprintf(fp, node->value.Boolean ? "true" : "false");
+            break;
+
+        case data::JSON_TYPE_NULL:
+            fprintf(fp, "null");
+            break;
+    }
+}
+#endif /* #if 0 */
 
 /*////////////////////////
 //   Public Functions   //
@@ -1352,4 +1525,545 @@ wave_error:
 wave_unsupported:
     if (out_desc) *out_desc = *fmt;
     return 0;
+}
+
+char* data::str_to_dec_s64(char *first, char *last, int64_t *out)
+{
+    int64_t  sign   = 1;
+    int64_t  result = 0;
+
+    if (first != last)
+    {
+        if ('-' == *first)
+        {
+            sign = -1;
+            ++first;
+        }
+        else if ('+' == *first)
+        {
+            sign = +1;
+            ++first;
+        }
+    }
+    for (; first != last && is_digit(*first); ++first)
+    {
+        result = 10 * result + (*first - '0');
+    }
+    *out = result * sign;
+    return first;
+}
+
+char* data::str_to_hex_u32(char *first, char *last, uint32_t *out)
+{
+    uint32_t result = 0;
+    for (; first != last; ++first)
+    {
+        unsigned int digit;
+        if (is_digit(*first))
+        {
+            digit = *first - '0';
+        }
+        else if (*first >= 'a' && *first <= 'f')
+        {
+            digit = *first - 'a' + 10;
+        }
+        else if (*first >= 'A' && *first <= 'F')
+        {
+            digit = *first - 'A' + 10;
+        }
+        else break;
+        result = 16 * result + digit;
+    }
+    *out = result;
+    return first;
+}
+
+char* data::str_to_hex_u64(char *first, char *last, uint64_t *out)
+{
+    uint64_t result = 0;
+    for (; first != last; ++first)
+    {
+        unsigned int digit;
+        if (is_digit(*first))
+        {
+            digit = *first - '0';
+        }
+        else if (*first >= 'a' && *first <= 'f')
+        {
+            digit = *first - 'a' + 10;
+        }
+        else if (*first >= 'A' && *first <= 'F')
+        {
+            digit = *first - 'A' + 10;
+        }
+        else break;
+        result = 16 * result + digit;
+    }
+    *out = result;
+    return first;
+}
+
+char* data::str_to_num_f64(char *first, char *last, double *out)
+{
+    double sign     = 1.0;
+    double result   = 0.0;
+    bool   exp_neg  = false;
+    int    exponent = 0;
+
+    if (first != last)
+    {
+        if ('-' == *first)
+        {
+            sign = -1.0;
+            ++first;
+        }
+        else if ('+' == *first)
+        {
+            sign = +1.0;
+            ++first;
+        }
+    }
+    for (; first != last && is_digit(*first); ++first)
+    {
+        result = 10 * result + (*first - '0');
+    }
+    if (first != last && '.' == *first)
+    {
+        double inv_base = 0.1;
+        ++first;
+        for (; first != last && is_digit(*first); ++first)
+        {
+            result   += (*first - '0') * inv_base;
+            inv_base *= 0.1;
+        }
+    }
+    result *= sign;
+    if (first != last && ('e' == *first || 'E' == *first))
+    {
+        ++first;
+        if ('-' == *first)
+        {
+            exp_neg = true;
+            ++first;
+        }
+        else if ('+' == *first)
+        {
+            exp_neg = false;
+            ++first;
+        }
+        for (; first != last && is_digit(*first); ++first)
+        {
+            exponent = 10 * exponent + (*first - '0');
+        }
+    }
+    if (exponent != 0)
+    {
+        double power_of_ten = 10;
+        for (; exponent > 1; exponent--)
+        {
+            power_of_ten *= 10;
+        }
+        if (exp_neg) result /= power_of_ten;
+        else         result *= power_of_ten;
+    }
+    *out = result;
+    return first;
+}
+
+void data::json_allocator_init(
+    data::json_allocator_t *allocator,
+    data::json_alloc_fn     alloc_func,
+    data::json_free_fn      free_func,
+    void                   *context)
+{
+    if (allocator != NULL)
+    {
+        allocator->Allocate = alloc_func;
+        allocator->Release  = free_func;
+        allocator->Context  = context;
+        fixup_allocator(allocator);
+    }
+}
+
+void data::json_item_init(data::json_item_t *node)
+{
+    if (node)
+    {
+        node->Parent       = NULL;
+        node->Next         = NULL;
+        node->FirstChild   = NULL;
+        node->LastChild    = NULL;
+        node->Key          = NULL;
+        node->ValueType    = data::JSON_TYPE_UNKNOWN;
+        node->Value.string = NULL;
+        node->Value.number = 0.0;
+    }
+}
+
+void data::json_document_append(data::json_item_t *lhs, data::json_item_t *rhs)
+{
+    rhs->Parent = lhs;
+    if (lhs->LastChild)
+    {
+        lhs->LastChild->Next = rhs;
+        lhs->LastChild       = rhs;
+    }
+    else
+    {
+        lhs->LastChild       = rhs;
+        lhs->FirstChild      = rhs;
+    }
+}
+
+bool data::json_parse(
+    char                   *document,
+    size_t                  document_size,
+    data::json_allocator_t *allocator,
+    data::json_item_t     **out_root,
+    data::json_error_t     *out_error)
+{
+    data::json_allocator_t  libc = {libc_alloc, libc_free};
+    data::json_item_t *root = NULL;
+    data::json_item_t *top  = NULL;
+    char              *name = NULL;
+    char              *it   = document;
+    size_t escaped_newlines = 0;
+
+    if (out_root  != NULL) *out_root =  NULL;
+    if (allocator == NULL) allocator = &libc;
+    fixup_allocator(allocator);
+
+    if (document == NULL || document_size == 0)
+    {
+        root = ::json_alloc(allocator);
+        root->ValueType = data::JSON_TYPE_NULL;
+        if (out_root) *out_root = root;
+        return true;
+    }
+
+    while (*it)
+    {
+        switch (*it)
+        {
+            case '{':
+            case '[':
+                {
+                    data::json_item_t *o = ::json_alloc(allocator);
+                    o->Key = name;
+                    o->ValueType = ('{' == *it) ? data::JSON_TYPE_OBJECT : data::JSON_TYPE_ARRAY;
+                    name = NULL;
+                    ++it;
+                    if (top)
+                    {
+                        // the new object is a child of the parent object, top.
+                        data::json_document_append(top, o);
+                    }
+                    else if (!root)
+                    {
+                        // this is the start of the root object.
+                        root = o;
+                    }
+                    else
+                    {
+                        ::json_free(o, allocator);
+                        JSON_ERROR(it, "Multiple root objects", out_error);
+                        // returns false.
+                    }
+                    top = o;
+                }
+                break;
+
+            case '}':
+            case ']':
+                {
+                    int32_t type = ('}' == *it) ? data::JSON_TYPE_OBJECT : data::JSON_TYPE_ARRAY;
+                    if (!top || top->ValueType != type)
+                    {
+                        JSON_ERROR(it, "Closing brace mismatch", out_error);
+                        // returns false.
+                    }
+                    ++it;
+                    top = top->Parent;
+                }
+                break;
+
+            case ':':
+            case '=':
+                {
+                    if (!top || top->ValueType != data::JSON_TYPE_OBJECT)
+                    {
+                        JSON_ERROR(it, "Unexpected character \':\' or \'=\'", out_error);
+                        // returns false.
+                    }
+                    ++it;
+                }
+                break;
+
+            case ',':
+                {
+                    if (!top)
+                    {
+                        JSON_ERROR(it, "Unexpected character \',\'", out_error);
+                        // returns false.
+                    }
+                    ++it;
+                }
+                break;
+
+            case '"':
+            case '\'':
+                {
+                    if (!top)
+                    {
+                        JSON_ERROR(it, "Unexpected quote character", out_error);
+                        // returns false.
+                    }
+                    ++it;
+
+                    char   *first = it;
+                    char   *last  = it;
+                    while (*it)
+                    {
+                        if ((unsigned char)*it < '\x20')
+                        {
+                            JSON_ERROR(it, "Unexpected control character", out_error);
+                            // returns false.
+                        }
+                        else if ('\\' == *it)
+                        {
+                            switch (it[1])
+                            {
+                                case '"':  *last = '"';  break;
+                                case '\'': *last = '\''; break;
+                                case '\\': *last = '\\'; break;
+                                case '/':  *last = '/';  break;
+                                case 'b':  *last = '\b'; break;
+                                case 'f':  *last = '\f'; break;
+                                case 'r':  *last = '\r'; break;
+                                case 't':  *last = '\t'; break;
+                                case 'n':
+                                    {
+                                        *last = '\n';
+                                        ++escaped_newlines;
+                                    }
+                                    break;
+                                case 'u':
+                                    {
+                                        uint32_t cp;
+                                        if (data::str_to_hex_u32(it + 2, it + 6, &cp) != it + 6)
+                                        {
+                                            JSON_ERROR(it, "Invalid Unicode codepoint", out_error);
+                                            // returns false.
+                                        }
+                                        if (cp < 0x7F)
+                                        {
+                                            *last = (char) cp;
+                                        }
+                                        else if (cp <= 0x7FF)
+                                        {
+                                            *last++ = (char)(0xC0 | (cp >> 6));
+                                            *last   = (char)(0x80 & (cp &  0x3F));
+                                        }
+                                        else if (cp < 0xFFFF)
+                                        {
+                                            *last++ = (char)(0xE0 | (cp >> 12));
+                                            *last++ = (char)(0x80 |((cp >>  6) & 0x3F));
+                                            *last   = (char)(0x80 | (cp & 0x3F));
+                                        }
+                                        it += 4;
+                                    }
+                                    break;
+                                default:
+                                    {
+                                        JSON_ERROR(it, "Unrecognized escape sequence", out_error);
+                                        // returns false.
+                                    }
+                            } // end switch (it[1])
+                            ++last;
+                            it += 2; // skip the escape sequence.
+                        } // end else if ('\\' == *it)
+                        else if (first[-1] == *it) // match quote type
+                        {
+                            // end of the string.
+                            *last = 0; // NULL-terminator.
+                            ++it;
+                            break;
+                        }
+                        else
+                        {
+                            // regular character in string.
+                            *last++ = *it++;
+                        }
+                    } // end while (*it)
+
+                    if (!name && top->ValueType == data::JSON_TYPE_OBJECT)
+                    {
+                        // this is a key name in the object.
+                        name = first;
+                    }
+                    else
+                    {
+                        // this is a new string value.
+                        data::json_item_t *value = ::json_alloc(allocator);
+                        value->Key          = name;
+                        value->ValueType    = data::JSON_TYPE_STRING;
+                        value->Value.string = first;
+                        name                = NULL;
+                        data::json_document_append(top, value);
+                    }
+                }
+                break;
+
+            case 'n':
+            case 'N':
+            case 't':
+            case 'T':
+            case 'f':
+            case 'F':
+                {
+                    if (!top)
+                    {
+                        JSON_ERROR(it, "Unexpected character", out_error);
+                        // returns false.
+                    }
+
+                    data::json_item_t *value    = ::json_alloc(allocator);
+                    if ((it[0] == 'n' || it[0] == 'N') &&
+                        (it[1] == 'u' || it[1] == 'U') &&
+                        (it[2] == 'l' || it[2] == 'L') &&
+                        (it[3] == 'l' || it[3] == 'L'))
+                    {
+                        value->Key           = name;
+                        value->ValueType     = data::JSON_TYPE_NULL;
+                        value->Value.string  = NULL;
+                        name                 = NULL;
+                        it                  += 4;
+                        data::json_document_append(top, value);
+                        break;
+                    }
+                    if ((it[0] == 't' || it[0] == 'T') &&
+                        (it[1] == 'r' || it[1] == 'R') &&
+                        (it[2] == 'u' || it[2] == 'U') &&
+                        (it[3] == 'e' || it[3] == 'E'))
+                    {
+                        value->Key           = name;
+                        value->ValueType     = data::JSON_TYPE_BOOLEAN;
+                        value->Value.boolean = true;
+                        name                 = NULL;
+                        it                  += 4;
+                        data::json_document_append(top, value);
+                        break;
+                    }
+                    if ((it[0] == 'f' || it[0] == 'F') &&
+                        (it[1] == 'a' || it[1] == 'A') &&
+                        (it[2] == 'l' || it[2] == 'L') &&
+                        (it[3] == 's' || it[3] == 'S') &&
+                        (it[4] == 'e' || it[4] == 'E'))
+                    {
+                        value->Key           = name;
+                        value->ValueType     = data::JSON_TYPE_BOOLEAN;
+                        value->Value.boolean = false;
+                        name                 = NULL;
+                        it                  += 5;
+                        data::json_document_append(top, value);
+                        break;
+                    }
+                    ::json_free(value, allocator);
+                    JSON_ERROR(it, "Unknown identifier", out_error);
+                    // returns false.
+                }
+                break;
+
+            case '-':
+            case '+':
+            case '0':
+            case '1':
+            case '2':
+            case '3':
+            case '4':
+            case '5':
+            case '6':
+            case '7':
+            case '8':
+            case '9':
+                {
+                    if (!top)
+                    {
+                        JSON_ERROR(it, "Unexpected character", out_error);
+                        // returns false.
+                    }
+
+                    char              *first = it;
+                    data::json_item_t *value = ::json_alloc(allocator);
+                    value->Key        = name;
+                    value->ValueType  = data::JSON_TYPE_INTEGER;
+                    name              = NULL;
+
+                    // find the end of the number and determine whether it's
+                    // a floating-point value instead of an integer.
+                    while (*it != '\x20' &&
+                           *it != '\x9'  &&
+                           *it != '\xD'  &&
+                           *it != '\xA'  &&
+                           *it != ','    &&
+                           *it != ']'    &&
+                           *it != '}')
+                    {
+                        if ('.' == *it || 'e' == *it || 'E' == *it)
+                        {
+                            value->ValueType = data::JSON_TYPE_NUMBER;
+                        }
+                        ++it;
+                    }
+                    if (data::JSON_TYPE_INTEGER == value->ValueType &&
+                        data::str_to_dec_s64(first, it,  &value->Value.integer) != it)
+                    {
+                        ::json_free(value, allocator);
+                        JSON_ERROR(first, "Bad integer value", out_error);
+                        // returns false.
+                    }
+                    if (data::JSON_TYPE_NUMBER  == value->ValueType &&
+                        data::str_to_num_f64(first, it,  &value->Value.number) != it)
+                    {
+                        ::json_free(value, allocator);
+                        JSON_ERROR(first, "Bad number value", out_error);
+                        // returns false.
+                    }
+                    data::json_document_append(top, value);
+                }
+                break;
+
+            default:
+                {
+                    JSON_ERROR(it, "Unexpected character", out_error);
+                    // returns false.
+                }
+        } // end switch (*it)
+
+        // skip whitespace
+        while ('\x20' == *it || '\x9' == *it || '\xD' == *it || '\xA' == *it)
+        {
+            ++it;
+        }
+    } // end while (*it)
+
+    if (top)
+    {
+        JSON_ERROR(it, "Not all objects or arrays were closed", out_error);
+        // returns false.
+    }
+
+    if (out_root) *out_root = root;
+    return true;
+}
+
+void data::json_free(data::json_item_t *item, data::json_allocator_t *allocator)
+{
+    if (item == NULL) return;
+    // recurse across the list:
+    data::json_free(item->Next, allocator);
+    // recurse down the tree:
+    data::json_free(item->LastChild, allocator);
+    // delete this node.
+    ::json_free(item, allocator);
 }
