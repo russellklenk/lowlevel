@@ -61,65 +61,46 @@ namespace data {
 /////////////////*/
 /// @summary The FourCC 'DDS ' using little-endian byte ordering.
 #ifndef LLDATAIN_DDS_MAGIC_LE
-#define LLDATAIN_DDS_MAGIC_LE    0x20534444U
+#define LLDATAIN_DDS_MAGIC_LE      0x20534444U
 #endif
 
 /*/////////////////
 //   Data Types  //
 /////////////////*/
-/// @summary Defines the different text encodings that can be detected by
-/// inspecting the first four bytes of a text document for a byte order marker.
-enum text_encoding_e
+/// @summary Bitflags used for bmfont_char_t::Channel to indicate which color
+/// channels of the glyph image contain the glyph data.
+enum bmfont_channel_e
 {
-    /// Indicates that the blob::determine_text_encoding() function is unsure
-    /// of the encoding. This typically indicates that no BOM is present.
-    TEXT_ENCODING_UNSURE        = 0,
-    /// Indicates that the text is encoded using single-byte ASCII.
-    TEXT_ENCODING_ASCII         = 1,
-    /// Indicates that the text is encoded using UTF-8.
-    TEXT_ENCODING_UTF8          = 2,
-    /// Indicates that the text is encoded using big-endian UTF-16.
-    TEXT_ENCODING_UTF16_BE      = 3,
-    /// Indicates that the text is encoded using little-endian UTF-16.
-    TEXT_ENCODING_UTF16_LE      = 4,
-    /// Indicates that the text is encoded using big-endian UTF-32.
-    TEXT_ENCODING_UTF32_BE      = 5,
-    /// Indicates that the text is encoded using little-endian UTF-32.
-    TEXT_ENCODING_UTF32_LE      = 6,
-    /// This type value is unused and serves only to force a minimum of 32-bits
-    /// of storage space for values of this enumeration type.
-    TEXT_ENCODING_FORCE_32BIT   = 0x7FFFFFFFL
+    BMFONT_CHANNEL_NONE         = (0 << 0),
+    BMFONT_CHANNEL_BLUE         = (1 << 0),
+    BMFONT_CHANNEL_GREEN        = (1 << 1),
+    BMFONT_CHANNEL_RED          = (1 << 2),
+    BMFONT_CHANNEL_ALPHA        = (1 << 3),
+    BMFONT_CHANNEL_ALL          = BMFONT_CHANNEL_BLUE  |
+                                  BMFONT_CHANNEL_GREEN |
+                                  BMFONT_CHANNEL_RED   |
+                                  BMFONT_CHANNEL_ALPHA
 };
 
-/// @summary An enumeration defining the types of JSON nodes that can be stored
-/// within a JSON document. The type is stored as a 4-byte field.
-enum json_item_type_e
+/// @summary Bitflags used for bmfont_info_block_t::Attributes.
+enum bmfont_attributes_e
 {
-    /// The node contains a value of unknown type. This typically indicates
-    /// an error, as all nodes should have associated types.
-    JSON_TYPE_UNKNOWN           = 0,
-    /// The node contains an object. Objects typically have children that
-    /// define their fields as key-value pairs.
-    JSON_TYPE_OBJECT            = 1,
-    /// The node represents an array. The array items are stored in the linked
-    /// list of siblings of the first child node.
-    JSON_TYPE_ARRAY             = 2,
-    /// The node represents a string field. The string is a pointer into the
-    /// JSON document buffer, and is guaranteed to be NULL-terminated.
-    JSON_TYPE_STRING            = 3,
-    /// The node represents an integer field. Integer fields are stored as
-    /// 64-bit signed values, and must be specified using either decimal or hex.
-    JSON_TYPE_INTEGER           = 4,
-    /// The node represents a floating-point field. Number fields are stored
-    /// as a 64-bit IEEE double-precision value.
-    JSON_TYPE_NUMBER            = 5,
-    /// The node represents a boolean field, with a value of either true or false.
-    JSON_TYPE_BOOLEAN           = 6,
-    /// The node represents a NULL value, as indicated by the constant 'null' or 'NULL'.
-    JSON_TYPE_NULL              = 7,
-    /// This type value is unused and serves only to force a minimum of 32-bits
-    /// of storage space for values of this enumeration type.
-    JSON_TYPE_FORCE_32BIT       = 0x7FFFFFFFL
+    BMFONT_ATTRIBUTE_NONE       = (0 << 0),
+    BMFONT_ATTRIBUTE_SMOOTH     = (1 << 0),
+    BMFONT_ATTRIBUTE_UNICODE    = (1 << 1),
+    BMFONT_ATTRIBUTE_ITALIC     = (1 << 2),
+    BMFONT_ATTRIBUTE_BOLD       = (1 << 3),
+    BMFONT_ATTRIBUTE_FIXED      = (1 << 4)
+};
+
+/// @summary Values used for bmfont_common_block_t::[Alpha/Red/Green/Blue]Channel.
+enum bmfont_content_e
+{
+    BMFONT_CONTENT_GLYPH        = 0,
+    BMFONT_CONTENT_OUTLINE      = 1,
+    BMFONT_CONTENT_COMBINED     = 2,
+    BMFONT_CONTENT_ZERO         = 3,
+    BMFONT_CONTENT_ONE          = 4
 };
 
 /// @summary Bitflags for dds_pixelformat_t::Flags. See MSDN documentation at:
@@ -372,6 +353,35 @@ enum dds_alpha_mode_e
     DDS_ALPHA_MODE_CUSTOM                   = 0x00000004U
 };
 
+/// @summary An enumeration defining the types of JSON nodes that can be stored
+/// within a JSON document. The type is stored as a 4-byte field.
+enum json_item_type_e
+{
+    JSON_TYPE_UNKNOWN                       = 0,
+    JSON_TYPE_OBJECT                        = 1,
+    JSON_TYPE_ARRAY                         = 2,
+    JSON_TYPE_STRING                        = 3,
+    JSON_TYPE_INTEGER                       = 4,
+    JSON_TYPE_NUMBER                        = 5,
+    JSON_TYPE_BOOLEAN                       = 6,
+    JSON_TYPE_NULL                          = 7,
+    JSON_TYPE_FORCE_32BIT                   = 0x7FFFFFFFL
+};
+
+/// @summary Defines the different text encodings that can be detected by
+/// inspecting the first four bytes of a text document for a byte order marker.
+enum text_encoding_e
+{
+    TEXT_ENCODING_UNSURE                    = 0,
+    TEXT_ENCODING_ASCII                     = 1,
+    TEXT_ENCODING_UTF8                      = 2,
+    TEXT_ENCODING_UTF16_BE                  = 3,
+    TEXT_ENCODING_UTF16_LE                  = 4,
+    TEXT_ENCODING_UTF32_BE                  = 5,
+    TEXT_ENCODING_UTF32_LE                  = 6,
+    TEXT_ENCODING_FORCE_32BIT               = 0x7FFFFFFFL
+};
+
 /// @summary Defines the recognized compression types.
 enum wav_compression_type_e
 {
@@ -380,6 +390,143 @@ enum wav_compression_type_e
     WAVE_COMPRESSION_ADPCM                  = 0x0002,
     WAVE_COMPRESSION_MPEG                   = 0x0050,
     WAVE_COMPRESISON_EXPERIMENTAL           = 0xFFFF
+};
+
+/// @summary Defines the fields present on the main file header.
+#pragma pack(push, 1)
+struct bmfont_header_t
+{
+    char Magic[3];              /// The characters 'BMF'.
+    char Version;               /// The file format version. Currently, 3.
+};
+#pragma pack(pop)
+
+/// @summary Stores metadata relating to a single block within a BMFont binary file.
+#pragma pack(push, 1)
+struct bmfont_block_header_t
+{
+    char     Id;                /// The block type identifier.
+    uint32_t DataSize;          /// The size of the block data, in bytes.
+};
+#pragma pack(pop)
+
+/// @summary The data associated with an INFO block in a BMFont file. Most of
+/// this information can be safely ignored and is used at design-time.
+#pragma pack(push, 1)
+struct bmfont_info_block_t
+{
+    int16_t  FontSize;          /// The font size, in points.
+    uint8_t  Attributes;        /// A combination of bmfont_attributes_e.
+    uint8_t  CharSet;           /// The name of the OEM charset (when not Unicode).
+    uint16_t StretchH;          /// The font height stretch percentage; 100 = none.
+    uint8_t  AA;                /// The supersampling level used, 1 = none.
+    uint8_t  PaddingTop;        /// The padding for each character, top side.
+    uint8_t  PaddingRight;      /// The padding for each character, right side.
+    uint8_t  PaddingBottom;     /// The padding for each character, bottom side.
+    uint8_t  PaddingLeft;       /// The padding for each character, left side.
+    uint8_t  SpacingX;          /// The horizontal spacing for each character.
+    uint8_t  SpacingY;          /// The vertical spacing for each character.
+    uint8_t  Outline;           /// The outline thickness for the glyphs.
+    char     FontName[1];       /// NULL-terminated ASCII font name string, variable.
+};
+#pragma pack(pop)
+
+/// @summary The data associated with a COMMON block in a BMFont file.
+#pragma pack(push, 1)
+struct bmfont_common_block_t
+{
+    uint16_t LineHeight;        /// The distance between each line of text, in pixels.
+    uint16_t BaseLine;          /// # of pixels from absolute top of line to glyph base.
+    uint16_t ScaleWidth;        /// Width of a texture page, in pixels.
+    uint16_t ScaleHeight;       /// Height of a texture page, in pixels.
+    uint16_t PageCount;         /// The number of texture pages in the font.
+    uint8_t  Attributes;        /// A combination of bmfont_attributes_e.
+    uint8_t  AlphaChannel;      /// One of bmfont_content_e.
+    uint8_t  RedChannel;        /// One of bmfont_content_e.
+    uint8_t  GreenChannel;      /// One of bmfont_content_e.
+    uint8_t  BlueChannel;       /// One of bmfont_content_e.
+};
+#pragma pack(pop)
+
+/// @summary The data associated with a PAGES block in a BMFont file. This
+/// block is essentially just a blob of character data. There is one NULL-
+/// terminated string for each page, and bmfont_common_block_t::PageCount pages.
+/// Each string is the same length.
+#pragma pack(push, 1)
+struct bmfont_pages_block_t
+{
+    char     PageNames[1];      /// Array of same-length NULL-terminated strings.
+};
+#pragma pack(pop)
+
+/// @summary Describes a single glyph within a texture page.
+#pragma pack(push, 1)
+struct bmfont_char_t
+{
+    uint32_t Codepoint;         /// The Unicode codepoint associated with the glyph.
+    uint16_t TextureX;          /// X-coordinate of the upper-left corner of the glyph.
+    uint16_t TextureY;          /// Y-coordinate of the upper-left corner of the glyph.
+    uint16_t Width;             /// Width of the glyph on the texture, in pixels.
+    uint16_t Height;            /// Height of the glyph on the texture, in pixels.
+    uint16_t OffsetX;           /// Horizontal offset when copying the glyph to the screen.
+    uint16_t OffsetY;           /// Vertical offset when copying the glyph to the screen.
+    uint16_t AdvanceX;          /// How much to advance the current position.
+    uint8_t  PageIndex;         /// The index of the page containing the glyph data.
+    uint8_t  Channel;           /// A combination of bmfont_channel_e indicating where glyph data is found.
+};
+#pragma pack(pop)
+
+/// @summary The data associated with a CHARS block in a BMFont file. This
+/// block is just a blob of bmfont_char_t instances, tightly packed. The number
+/// of characters is bmfont_block_header_t::DataSize / sizeof(bmfont_char_t).
+#pragma pack(push, 1)
+struct bmfont_chars_block_t
+{
+    bmfont_char_t Char[1];      /// Array of bmfont_char_t.
+};
+#pragma pack(pop)
+
+/// @summary Describes a kerning pair, which controls the spacing between a
+/// specific pair of glyphs. Not every glyph pair will have custom kerning.
+#pragma pack(push, 1)
+struct bmfont_kerning_t
+{
+    uint32_t A;                 /// The codepoint of the first glyph.
+    uint32_t B;                 /// The codepoint of the second glyph.
+    int32_t  AdvanceX;          /// The amount to advance the current position when drawing the glyph pair.
+};
+#pragma pack(pop)
+
+/// @summary The data associated with a KERNING block in a BMFont file. This
+/// block is just a blob of bmfont_kerning_t instances, tightly packed. The
+/// number of pairs is bmfont_block_header_t::DataSize / sizeof(bmfont_kerning_t).
+#pragma pack(push, 1)
+struct bmfont_kerning_block_t
+{
+    bmfont_kerning_t Pair[1];   /// Array of bmfont_kerning_t.
+};
+#pragma pack(pop)
+
+/// @summary Stores a description of a BMfont. The block pointers point into
+/// the source data directly. Blocks not present in the source data are NULL.
+struct bmfont_desc_t
+{
+    typedef bmfont_info_block_t     bmfont_ib_t;
+    typedef bmfont_common_block_t   bmfont_cb_t;
+    typedef bmfont_kerning_block_t  bmfont_kb_t;
+    typedef bmfont_pages_block_t    bmfont_pb_t;
+    typedef bmfont_chars_block_t    bmfont_gb_t;
+
+    size_t          Version;    /// The BMfont file format version.
+    size_t          NumPages;   /// The number of pages defined on the font.
+    size_t          PageLength; /// Length of a single page filename, including zero byte.
+    size_t          NumGlyphs;  /// The number of glyphs defined on the font.
+    size_t          NumKerning; /// The number of entries in the kerning table.
+    bmfont_ib_t    *Info;       /// Pointer to the info block data, or NULL.
+    bmfont_cb_t    *Common;     /// Pointer to the common block data, or NULL.
+    bmfont_pb_t    *Pages;      /// Pointer to the page filenames block data, or NULL.
+    bmfont_gb_t    *Chars;      /// Pointer to the chars block data, or NULL.
+    bmfont_kb_t    *Kerning;    /// Pointer to the kerning block data, or NULL.
 };
 
 /// @summary The equivalent of the DDS_PIXELFORMAT structure. See MSDN at:
@@ -449,50 +596,6 @@ struct dds_level_desc_t
     uint32_t Format;          /// One of dxgi_format_e.
 };
 
-/// @summary Define the RIFF header that appears at the start of a WAVE file.
-#pragma pack(push, 1)
-struct riff_header_t
-{
-    uint32_t ChunkId;         /// 'RIFF' (0x52494646)
-    uint32_t DataSize;        /// The file size, minus 8 (for the header).
-    uint32_t RiffType;        /// The file type, 'WAVE' (0x57415645)
-};
-#pragma pack(pop)
-
-/// @summary Define the header that appears at the start of each RIFF chunk.
-/// Note that chunk headers start on even addresses only.
-#pragma pack(push, 1)
-struct riff_chunk_header_t
-{
-    uint32_t ChunkId;         /// Varies; 'fmt ' (0x666D7420) and 'data' (0x64617461)
-    uint32_t DataSize;        /// The size of the chunk data, not including the header.
-};
-#pragma pack(pop)
-
-/// @summary Define the data comprising the WAV format chunk, used to describe sample data.
-#pragma pack(push, 1)
-struct wave_format_t
-{
-    uint16_t CompressionType; /// One of wav_compression_type_e.
-    uint16_t ChannelCount;    /// Number of channels (1 = mono, 2 = stereo).
-    uint32_t SampleRate;      /// Number of samples per-second.
-    uint32_t BytesPerSecond;  /// Average number of bytes per-second for streaming.
-    uint16_t BlockAlignment;  /// Number of bytes per-sample.
-    uint16_t BitsPerSample;   /// Number of bytes per-sample.
-    uint16_t FormatDataSize;  /// Size of the format-specific data, in bytes.
-    uint8_t  FormatData[1];   /// Optional extra format-specific data.
-};
-#pragma pack(pop)
-
-/// @summary Describes a chunk containing uncompressed PCM sample data.
-struct wave_data_t
-{
-    size_t   DataSize;        /// The size of the sample data, in bytes.
-    size_t   SampleCount;     /// The number of samples in the clip.
-    void    *SampleData;      /// Pointer to the start of the clip sample data.
-    float    Duration;        /// The clip duration, in seconds.
-};
-
 /// @summary Describes an error that was encountered while parsing a JSON document.
 struct json_error_t
 {
@@ -544,6 +647,50 @@ struct json_allocator_t
     json_alloc_fn Allocate;   /// The callback used to allocate a document node.
     json_free_fn  Release;    /// The callback used to free a document node.
     void         *Context;    /// Opaque data associated with the allocator.
+};
+
+/// @summary Define the RIFF header that appears at the start of a WAVE file.
+#pragma pack(push, 1)
+struct riff_header_t
+{
+    uint32_t ChunkId;         /// 'RIFF' (0x52494646)
+    uint32_t DataSize;        /// The file size, minus 8 (for the header).
+    uint32_t RiffType;        /// The file type, 'WAVE' (0x57415645)
+};
+#pragma pack(pop)
+
+/// @summary Define the header that appears at the start of each RIFF chunk.
+/// Note that chunk headers start on even addresses only.
+#pragma pack(push, 1)
+struct riff_chunk_header_t
+{
+    uint32_t ChunkId;         /// Varies; 'fmt ' (0x666D7420) and 'data' (0x64617461)
+    uint32_t DataSize;        /// The size of the chunk data, not including the header.
+};
+#pragma pack(pop)
+
+/// @summary Define the data comprising the WAV format chunk, used to describe sample data.
+#pragma pack(push, 1)
+struct wave_format_t
+{
+    uint16_t CompressionType; /// One of wav_compression_type_e.
+    uint16_t ChannelCount;    /// Number of channels (1 = mono, 2 = stereo).
+    uint32_t SampleRate;      /// Number of samples per-second.
+    uint32_t BytesPerSecond;  /// Average number of bytes per-second for streaming.
+    uint16_t BlockAlignment;  /// Number of bytes per-sample.
+    uint16_t BitsPerSample;   /// Number of bytes per-sample.
+    uint16_t FormatDataSize;  /// Size of the format-specific data, in bytes.
+    uint8_t  FormatData[1];   /// Optional extra format-specific data.
+};
+#pragma pack(pop)
+
+/// @summary Describes a chunk containing uncompressed PCM sample data.
+struct wave_data_t
+{
+    size_t   DataSize;        /// The size of the sample data, in bytes.
+    size_t   SampleCount;     /// The number of samples in the clip.
+    void    *SampleData;      /// Pointer to the start of the clip sample data.
+    float    Duration;        /// The clip duration, in seconds.
 };
 
 /*////////////////
