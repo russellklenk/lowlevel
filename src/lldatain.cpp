@@ -1184,14 +1184,12 @@ bool data::dds_mipmap(data::dds_header_t const *header, data::dds_header_dxt10_t
     }
     if (header)
     {
-        if ((header->Caps  & DDSCAPS_COMPLEX) == 0)
-            return false;
-        if ((header->Caps  & DDSCAPS_MIPMAP) == 0)
-            return false;
-        if ((header->Flags & DDSD_MIPMAPCOUNT) == 0)
-            return false;
-
-        return header->Levels > 0;
+        if (header->Caps & DDSCAPS_MIPMAP)
+            return true;
+        if (header->Flags & DDSD_MIPMAPCOUNT)
+            return true;
+        if (header->Levels > 0)
+            return true;
     }
     return false;
 }
