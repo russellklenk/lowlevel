@@ -802,7 +802,7 @@ static void print_leveldesc(FILE *fp, data::dds_level_desc_t const *desc)
     fprintf(fp, "  BytesPerRow: %u\n", uint32_t(desc->BytesPerRow));
     fprintf(fp, "  BytesPerSlc: %u\n", uint32_t(desc->BytesPerSlice));
     fprintf(fp, "  DataSize:    %u\n", uint32_t(desc->DataSize));
-    fprintf(fp, "  LevelData:   0x%p\n", desc->LevelData);
+    fprintf(fp, "  LevelData:   %p\n", desc->LevelData);
     fprintf(fp, "  Format:      %s\n", dxgi_format_str(desc->Format));
     fprintf(fp, "\n");
 }
