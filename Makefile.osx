@@ -9,7 +9,7 @@ LIBRARY_DIRS  = -Llib
 PROJ_WARNINGS = -Wall -Wextra
 PROJ_CCFLAGS  = -ggdb -std=c++0x -O3 -fstrict-aliasing -D __STDC_FORMAT_MACROS
 PROJ_LDFLAGS  =
-TEST_TARGETS  = test/dds_info
+TEST_TARGETS  = test/ddsinfo
 TEST_SOURCES  = $(wildcard test/*.cpp)
 TEST_OBJECTS  = ${TEST_SOURCES:.cpp=.o}
 TEST_DEPS     = ${TEST_SOURCES:.cpp=.dep}
