@@ -2108,6 +2108,7 @@ bool data::bmfont_describe(void const *data, size_t data_size, data::bmfont_desc
                 {
                     out_desc->Info       = (data::bmfont_info_block_t*) block_ptr;
                     cur_ptr             += block_hdr->DataSize;
+                    cur_ptr             += hdr_size;
                 }
                 break;
             case 2:
@@ -2115,6 +2116,7 @@ bool data::bmfont_describe(void const *data, size_t data_size, data::bmfont_desc
                     out_desc->Common     = (data::bmfont_common_block_t*) block_ptr;
                     out_desc->NumPages   = out_desc->Common->PageCount;
                     cur_ptr             += block_hdr->DataSize;
+                    cur_ptr             += hdr_size;
                 }
                 break;
             case 3:
@@ -2122,6 +2124,7 @@ bool data::bmfont_describe(void const *data, size_t data_size, data::bmfont_desc
                     out_desc->Pages      = (data::bmfont_pages_block_t*) block_ptr;
                     out_desc->PageLength = block_hdr->DataSize / out_desc->NumPages;
                     cur_ptr             += block_hdr->DataSize;
+                    cur_ptr             += hdr_size;
                 }
                 break;
             case 4:
@@ -2129,6 +2132,7 @@ bool data::bmfont_describe(void const *data, size_t data_size, data::bmfont_desc
                     out_desc->Chars      = (data::bmfont_chars_block_t*) block_ptr;
                     out_desc->NumGlyphs  = block_hdr->DataSize / sizeof(data::bmfont_char_t);
                     cur_ptr             += block_hdr->DataSize;
+                    cur_ptr             += hdr_size;
                 }
                 break;
             case 5:
@@ -2136,11 +2140,13 @@ bool data::bmfont_describe(void const *data, size_t data_size, data::bmfont_desc
                     out_desc->Kerning    = (data::bmfont_kerning_block_t*) block_ptr;
                     out_desc->NumKerning = block_hdr->DataSize / sizeof(data::bmfont_kerning_t);
                     cur_ptr             += block_hdr->DataSize;
+                    cur_ptr             += hdr_size;
                 }
                 break;
             default:
                 {
                     cur_ptr += block_hdr->DataSize;
+                    cur_ptr += hdr_size;
                 }
                 break;
         }
