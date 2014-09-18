@@ -493,7 +493,7 @@ struct bmfont_kerning_t
 {
     uint32_t A;                 /// The codepoint of the first glyph.
     uint32_t B;                 /// The codepoint of the second glyph.
-    int32_t  AdvanceX;          /// The amount to advance the current position when drawing the glyph pair.
+    int16_t  AdvanceX;          /// The amount to advance the current position when drawing the glyph pair.
 };
 #pragma pack(pop)
 
@@ -979,6 +979,14 @@ LLDATAIN_PUBLIC bool json_parse(
 /// @param item The JSON document node to free. Pass the root node to free the entire document tree.
 /// @param allocator The same allocator implementation passed to json_parse().
 LLDATAIN_PUBLIC void json_free(data::json_item_t *item, data::json_allocator_t *allocator);
+
+/// @summary Retrieves a description of a bitmap font stored in the BMfont binary format.
+/// @param data The buffer from which the data should be read.
+/// @param data_size The maximum number of bytes to read from the input buffer.
+/// @param out_desc On return, this structure is populated with pointers to the
+/// various data blocks within the BMfont.
+/// @return true if the font was parsed successfully.
+LLDATAIN_PUBLIC bool bmfont_describe(void const *data, size_t data_size, data::bmfont_desc_t *out_desc);
 
 /// @summary Generates a little-endian FOURCC.
 /// @param a...d The four characters comprising the code.

@@ -2065,3 +2065,101 @@ void data::json_free(data::json_item_t *item, data::json_allocator_t *allocator)
     // delete this node.
     ::json_free(item, allocator);
 }
+
+bool data::bmfont_describe(void const *data, size_t data_size, data::bmfont_desc_t *out_desc)
+{
+    data::bmfont_header_t *header = NULL;
+    uint8_t const *base_ptr = (uint8_t const*) data;
+    uint8_t const *end_ptr  = base_ptr + data_size;
+    uint8_t const *cur_ptr  = base_ptr;
+    size_t  const  hdr_size = sizeof(data::bmfont_block_header_t);
+
+    if (data == NULL || data_size < sizeof(data::bmfont_header_t))
+        goto bmfont_error;
+    if (out_desc == NULL)
+        goto bmfont_error;
+
+    header = (data::bmfont_header_t*) base_ptr;
+    if (header->Magic[0] != 'B' || header->Magic[1] != 'M' || header->Magic[2] != 'F')
+        goto bmfont_error;
+    if (header->Version != 3)
+        goto bmfont_error;
+
+    out_desc->Version    = header->Version;
+    out_desc->NumPages   = 0;
+    out_desc->PageLength = 0;
+    out_desc->NumGlyphs  = 0;
+    out_desc->NumKerning = 0;
+    out_desc->Info       = NULL;
+    out_desc->Common     = NULL;
+    out_desc->Pages      = NULL;
+    out_desc->Chars      = NULL;
+    out_desc->Kerning    = NULL;
+    cur_ptr              = base_ptr + sizeof(data::bmfont_header_t);
+
+    while (cur_ptr < end_ptr)
+    {
+        data::bmfont_block_header_t *block_hdr = (data::bmfont_block_header_t*) cur_ptr;
+        uint8_t const               *block_ptr =  data_at<uint8_t>(cur_ptr, hdr_size);
+
+        switch (block_hdr->Id)
+        {
+            case 1:
+                {
+                    out_desc->Info       = (data::bmfont_info_block_t*) block_ptr;
+                    cur_ptr             += block_hdr->DataSize;
+                }
+                break;
+            case 2:
+                {
+                    out_desc->Common     = (data::bmfont_common_block_t*) block_ptr;
+                    out_desc->NumPages   = out_desc->Common->PageCount;
+                    cur_ptr             += block_hdr->DataSize;
+                }
+                break;
+            case 3:
+                {
+                    out_desc->Pages      = (data::bmfont_pages_block_t*) block_ptr;
+                    out_desc->PageLength = block_hdr->DataSize / out_desc->NumPages;
+                    cur_ptr             += block_hdr->DataSize;
+                }
+                break;
+            case 4:
+                {
+                    out_desc->Chars      = (data::bmfont_chars_block_t*) block_ptr;
+                    out_desc->NumGlyphs  = block_hdr->DataSize / sizeof(data::bmfont_char_t);
+                    cur_ptr             += block_hdr->DataSize;
+                }
+                break;
+            case 5:
+                {
+                    out_desc->Kerning    = (data::bmfont_kerning_block_t*) block_ptr;
+                    out_desc->NumKerning = block_hdr->DataSize / sizeof(data::bmfont_kerning_t);
+                    cur_ptr             += block_hdr->DataSize;
+                }
+                break;
+            default:
+                {
+                    cur_ptr += block_hdr->DataSize;
+                }
+                break;
+        }
+    }
+    return true;
+
+bmfont_error:
+    if (out_desc)
+    {
+        out_desc->Version    = 0;
+        out_desc->NumPages   = 0;
+        out_desc->PageLength = 0;
+        out_desc->NumGlyphs  = 0;
+        out_desc->NumKerning = 0;
+        out_desc->Info       = NULL;
+        out_desc->Common     = NULL;
+        out_desc->Pages      = NULL;
+        out_desc->Chars      = NULL;
+        out_desc->Kerning    = NULL;
+    }
+    return false;
+}
