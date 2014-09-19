@@ -9,7 +9,7 @@ LIBRARY_DIRS  = -Llib
 PROJ_WARNINGS = -Wall -Wextra
 PROJ_CCFLAGS  = -ggdb -std=c++0x -O3 -fstrict-aliasing -D __STDC_FORMAT_MACROS
 PROJ_LDFLAGS  =
-TEST_TARGETS  = test/ddsinfo
+TEST_TARGETS  = test/ddsinfo test/fntinfo
 TEST_SOURCES  = $(wildcard test/*.cpp)
 TEST_OBJECTS  = ${TEST_SOURCES:.cpp=.o}
 TEST_DEPS     = ${TEST_SOURCES:.cpp=.dep}
@@ -32,8 +32,11 @@ ${DEPENDENCIES}: %.dep: %.cpp ${HEADERS} Makefile.osx
 
 output:: ${TARGET}
 
-${TEST_TARGETS}: ${TEST_OBJECTS}
-	${CC} ${LDFLAGS} ${TEST_LDFLAGS} -o $@ $^ ${TEST_LIBRARIES}
+test/ddsinfo: ${TEST_OBJECTS}
+	${CC} ${LDFLAGS} ${TEST_LDFLAGS} -o $@ test/dds_info.o ${TEST_LIBRARIES}
+
+test/fntinfo: ${TEST_OBJECTS}
+	${CC} ${LDFLAGS} ${TEST_LDFLAGS} -o $@ test/fnt_info.o ${TEST_LIBRARIES}
 
 ${TEST_OBJECTS}: %.o: %.cpp ${TEST_DEPS}
 	${CC} ${INCLUDE_DIRS} ${CCFLAGS} ${TEST_CCFLAGS} -o $@ -c $<
