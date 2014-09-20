@@ -2169,3 +2169,120 @@ bmfont_error:
     }
     return false;
 }
+
+bool data::tga_header(void const *data, size_t data_size, data::tga_header_t *out_header)
+{
+    uint8_t const *base_ptr   = (uint8_t const*) data;
+    uint8_t const *header_ptr = (uint8_t const*) data;
+    size_t         min_size   = sizeof(data::tga_header_t);
+
+    if (data == NULL || data_size < min_size)
+        goto tga_error;
+
+    if (out_header) *out_header = *(data::tga_header_t*) header_ptr;
+    return true;
+
+tga_error:
+    if (out_header)
+    {
+        out_header->ImageIdLength  = 0;
+        out_header->ColormapType   = data::TGA_COLORMAPTYPE_NONE;
+        out_header->ImageType      = data::TGA_IMAGETYPE_NO_IMAGE_DATA;
+        out_header->CmapFirstEntry = 0;
+        out_header->CmapLength     = 0;
+        out_header->CmapEntrySize  = 0;
+        out_header->ImageXOrigin   = 0;
+        out_header->ImageYOrigin   = 0;
+        out_header->ImageWidth     = 0;
+        out_header->ImageHeight    = 0;
+        out_header->ImageBitDepth  = 0;
+        out_header->ImageFlags     = 0;
+    }
+    return false;
+}
+
+bool data::tga_footer(void const *data, size_t data_size, data::tga_footer_t *out_footer)
+{
+    data::tga_footer_t  footer;
+    uint8_t const      *base_ptr   = (uint8_t const*) data;
+    uint8_t const      *footer_ptr = (base_ptr + data_size)     - sizeof(data::tga_footer_t);
+    size_t              min_size   = sizeof(data::tga_header_t) + sizeof(data::tga_footer_t);
+
+    if (data == NULL || data_size < min_size)
+        goto tga_error;
+
+    footer = *(data::tga_footer_t*) footer_ptr;
+    if (strncmp(footer.Signature, "TRUEVISION-XFILE", sizeof(footer.Signature)) != 0)
+        goto tga_error;
+
+    if (out_footer) *out_footer = footer;
+    return true;
+
+tga_error:
+    if (out_footer)
+    {
+        out_footer->ExtOffset    = 0;
+        out_footer->DevOffset    = 0;
+        out_footer->Signature[0] = '\0';
+        out_footer->PeriodChar   = '\0';
+        out_footer->ZeroByte     = '\0';
+
+    }
+    return false;
+}
+
+bool data::tga_describe(void const *data, size_t data_size, data::tga_desc_t *out_desc)
+{
+    data::tga_header_t header;
+    uint8_t const     *base_ptr = (uint8_t const*) data;
+    size_t cmap_offset = 0;
+    size_t data_offset = 0;
+
+    if (!data::tga_header(data, data_size, &header))
+        goto tga_error;
+
+    cmap_offset = sizeof(data::tga_header_t) + header.ImageIdLength;
+    data_offset = cmap_offset + (header.CmapLength * (header.CmapEntrySize / 8));
+
+    if (out_desc)
+    {
+        out_desc->ColormapType     = header.ColormapType;
+        out_desc->ImageType        = header.ImageType;
+        out_desc->CmapFirstEntry   = header.CmapFirstEntry;
+        out_desc->CmapLength       = header.CmapLength;
+        out_desc->CmapEntrySize    = header.CmapEntrySize;
+
+        if (header.ImageYOrigin == 0 || (header.ImageFlags & (1 << 5)) == 0)
+            out_desc->OriginBottom = true;
+        else
+            out_desc->OriginBottom = false;
+
+        out_desc->ImageWidth       = header.ImageWidth;
+        out_desc->ImageHeight      = header.ImageHeight;
+        out_desc->BitsPerPixel     = header.ImageBitDepth;
+        out_desc->PixelDataSize    = header.ImageWidth * header.ImageHeight * (header.ImageBitDepth / 8);
+        out_desc->ColormapDataSize = header.CmapLength *(header.CmapEntrySize / 8);
+        out_desc->ColormapData     = (void*) (base_ptr + cmap_offset);
+        out_desc->PixelData        = (void*) (base_ptr + data_offset);
+    }
+    return true;
+
+tga_error:
+    if (out_desc)
+    {
+        out_desc->ColormapType     = data::TGA_COLORMAPTYPE_NONE;
+        out_desc->ImageType        = data::TGA_IMAGETYPE_NO_IMAGE_DATA;
+        out_desc->CmapFirstEntry   = 0;
+        out_desc->CmapLength       = 0;
+        out_desc->CmapEntrySize    = 0;
+        out_desc->OriginBottom     = false;
+        out_desc->ImageWidth       = 0;
+        out_desc->ImageHeight      = 0;
+        out_desc->BitsPerPixel     = 0;
+        out_desc->PixelDataSize    = 0;
+        out_desc->ColormapDataSize = 0;
+        out_desc->ColormapData     = NULL;
+        out_desc->PixelData        = NULL;
+    }
+    return false;
+}

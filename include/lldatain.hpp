@@ -382,6 +382,27 @@ enum text_encoding_e
     TEXT_ENCODING_FORCE_32BIT               = 0x7FFFFFFFL
 };
 
+/// @summary Defines the color map types supported by the image format. This
+/// library only supports loading of TGA_COLORMAPTYPE_NONE images.
+enum tga_colormaptype_e
+{
+    TGA_COLORMAPTYPE_NONE                   = 0,
+    TGA_COLORMAPTYPE_INCLUDED               = 1
+};
+
+/// @summary Defines the image types supported by the image format. This library
+/// only supports loading of TGA_IMAGETYPE_UNCOMPRESSED_TRUE images.
+enum tga_imagetype_e
+{
+    TGA_IMAGETYPE_NO_IMAGE_DATA             = 0,
+    TGA_IMAGETYPE_UNCOMPRESSED_PAL          = 1,
+    TGA_IMAGETYPE_UNCOMPRESSED_TRUE         = 2,
+    TGA_IMAGETYPE_UNCOMPRESSED_BW           = 3,
+    TGA_IMAGETYPE_RLE_PAL                   = 9,
+    TGA_IMAGETYPE_RLE_TRUE                  = 10,
+    TGA_IMAGETYPE_RLE_BW                    = 11
+};
+
 /// @summary Defines the recognized compression types.
 enum wav_compression_type_e
 {
@@ -693,6 +714,56 @@ struct wave_data_t
     float    Duration;        /// The clip duration, in seconds.
 };
 
+/// @summary Describes the TGA file header.
+#pragma pack (push, 1)
+struct tga_header_t
+{
+    uint8_t  ImageIdLength;   /// The length of the image ID string following the header.
+    uint8_t  ColormapType;    /// One of tga_colormaptype_e.
+    uint8_t  ImageType;       /// One of tga_imagetype_e.
+    uint16_t CmapFirstEntry;  /// The index of the first colormap entry.
+    uint16_t CmapLength;      /// The number of entries in the colormap.
+    uint8_t  CmapEntrySize;   /// The size of a single colormap entry, in bits.
+    uint16_t ImageXOrigin;    /// The origin point of the image, 0 = lower left corner.
+    uint16_t ImageYOrigin;    /// The origin point of the image, 0 = lower left corner.
+    uint16_t ImageWidth;      /// The width of the image, in pixels.
+    uint16_t ImageHeight;     /// The height of the image, in pixels.
+    uint8_t  ImageBitDepth;   /// The number of bits per-pixel.
+    uint8_t  ImageFlags;      /// Bits 0..3 = # of attribute bits. Bits 4,5 = origin.
+};
+#pragma pack (pop)
+
+/// @summary Describes the TGA file footer.
+#pragma pack (push, 1)
+struct tga_footer_t
+{
+    uint32_t ExtOffset;       /// The byte offset of the extension area.
+    uint32_t DevOffset;       /// The byte offset of the developer directory.
+    char     Signature[16];   /// TRUEVISION-XFILE
+    char     PeriodChar;      /// A single '.' character.
+    char     ZeroByte;        /// A single zero byte.
+};
+#pragma pack (pop)
+
+/// @summary Describes the important data from a TGA image. The application is
+/// responsible for decoding the pixel data.
+struct tga_desc_t
+{
+    uint8_t  ColormapType;    /// One of tga_colormaptype_e.
+    uint8_t  ImageType;       /// One of tga_imagetype_e.
+    uint16_t CmapFirstEntry;  /// The index of the first colormap entry.
+    uint16_t CmapLength;      /// The number of entries in the colormap.
+    uint16_t CmapEntrySize;   /// The size of a single colormap entry, in bits.
+    bool     OriginBottom;    /// true if the origin is the lower left corner.
+    size_t   ImageWidth;      /// The width of the image, in pixels.
+    size_t   ImageHeight;     /// The height of the image, in pixels.
+    size_t   BitsPerPixel;    /// The number of bits per-pixel, including alpha.
+    size_t   PixelDataSize;   /// The size of the pixel data block, in bytes.
+    size_t   ColormapDataSize;/// The size of the colormap data block, in bytes.
+    void    *ColormapData;    /// Pointer to the start of the colormap data.
+    void    *PixelData;       /// Pointer to the start of the image data.
+};
+
 /*////////////////
 //   Functions  //
 ////////////////*/
@@ -987,6 +1058,27 @@ LLDATAIN_PUBLIC void json_free(data::json_item_t *item, data::json_allocator_t *
 /// various data blocks within the BMfont.
 /// @return true if the font was parsed successfully.
 LLDATAIN_PUBLIC bool bmfont_describe(void const *data, size_t data_size, data::bmfont_desc_t *out_desc);
+
+/// @summary Reads the header present in all TGA files.
+/// @param data The buffer from which the header data should be read.
+/// @param data_size The maximum number of bytes to read from the input buffer.
+/// @param out_header Pointer to the structure to populate.
+/// @return true if the file appears to be a valid TGA file.
+LLDATAIN_PUBLIC bool tga_header(void const *data, size_t data_size, data::tga_header_t *out_header);
+
+/// @summary Reads the footer present in TGA version 2 files.
+/// @param data The buffer from which the header data should be read.
+/// @param data_size The maximum number of bytes to read from the input buffer.
+/// @param out_footer Pointer to the structure to populate.
+/// @return true if the file contains a valid footer and is thus a version 2 image.
+LLDATAIN_PUBLIC bool tga_footer(void const *data, size_t data_size, data::tga_footer_t *out_footer);
+
+/// @summary Retrieves a description of a TGA image.
+/// @param data The buffer from which the data should be read.
+/// @param data_size The maximum number of bytes to read from the input buffer.
+/// @param out_desc On return, this structure is populated with information about the image.
+/// @return true if the image was parsed successfully.
+LLDATAIN_PUBLIC bool tga_describe(void const *data, size_t data_size, data::tga_desc_t *out_desc);
 
 /// @summary Generates a little-endian FOURCC.
 /// @param a...d The four characters comprising the code.
