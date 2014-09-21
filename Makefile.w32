@@ -9,7 +9,7 @@ LIBRARY_DIRS  = -Llib
 PROJ_WARNINGS = -Wall -Wextra
 PROJ_CCFLAGS  = -std=gnu++0x -O3 -fstrict-aliasing -D __STDC_FORMAT_MACROS -DLLOPENGL_USE_GLEW
 PROJ_LDFLAGS  =
-TEST_TARGETS  = test/ddsinfo.exe test/fntinfo.exe
+TEST_TARGETS  = test/ddsinfo.exe test/fntinfo.exe test/tgainfo.exe
 TEST_SOURCES  = $(wildcard test/*.cpp)
 TEST_OBJECTS  = ${TEST_SOURCES:.cpp=.o}
 TEST_DEPS     = ${TEST_SOURCES:.cpp=.dep}
@@ -37,6 +37,9 @@ test/ddsinfo.exe: ${TEST_OBJECTS}
 
 test/fntinfo.exe: ${TEST_OBJECTS}
 	${CC} ${LDFLAGS} ${TEST_LDFLAGS} -o $@ test/fnt_info.o ${TEST_LIBRARIES}
+
+test/tgainfo.exe: ${TEST_OBJECTS}
+    ${CC} ${LDFLAGS} ${TEST_LDFLAGS} -o $@ test/tga_info.o ${TEST_LIBRARIES}
 
 ${TEST_OBJECTS}: %.o: %.cpp ${TEST_DEPS}
 	${CC} ${INCLUDE_DIRS} ${CCFLAGS} ${TEST_CCFLAGS} -o $@ -c $<
