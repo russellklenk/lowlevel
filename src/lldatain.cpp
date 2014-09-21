@@ -2260,10 +2260,30 @@ bool data::tga_describe(void const *data, size_t data_size, data::tga_desc_t *ou
         out_desc->ImageWidth       = header.ImageWidth;
         out_desc->ImageHeight      = header.ImageHeight;
         out_desc->BitsPerPixel     = header.ImageBitDepth;
-        out_desc->PixelDataSize    = header.ImageWidth * header.ImageHeight * (header.ImageBitDepth / 8);
+        out_desc->PixelDataSize    = 0;
         out_desc->ColormapDataSize = header.CmapLength *(header.CmapEntrySize / 8);
         out_desc->ColormapData     = (void*) (base_ptr + cmap_offset);
         out_desc->PixelData        = (void*) (base_ptr + data_offset);
+
+        switch (header.ImageType)
+        {
+            case data::TGA_IMAGETYPE_NO_IMAGE_DATA:
+                out_desc->PixelDataSize = 0;
+                break;
+            case data::TGA_IMAGETYPE_UNCOMPRESSED_GRAY:
+            case data::TGA_IMAGETYPE_RLE_GRAY:
+                out_desc->PixelDataSize = header.ImageWidth * header.ImageHeight;
+                break;
+            case data::TGA_IMAGETYPE_UNCOMPRESSED_PAL:
+            case data::TGA_IMAGETYPE_UNCOMPRESSED_TRUE:
+            case data::TGA_IMAGETYPE_RLE_PAL:
+            case data::TGA_IMAGETYPE_RLE_TRUE:
+                out_desc->PixelDataSize = header.ImageWidth * header.ImageHeight * 4;
+                break;
+            default:
+                out_desc->PixelDataSize = 0;
+                break;
+        }
     }
     return true;
 
@@ -2284,5 +2304,191 @@ tga_error:
         out_desc->ColormapData     = NULL;
         out_desc->PixelData        = NULL;
     }
+    return false;
+}
+
+bool data::tga_decode_r8(void *dst, size_t dst_size, data::tga_desc_t const *desc)
+{
+    if (desc == NULL || desc->PixelDataSize == 0 || desc->PixelData == NULL)
+        return false; // invalid image description
+    if (dst  == NULL || dst_size < desc->PixelDataSize)
+        return false; // invalid destination buffer
+    if (desc->ImageType != data::TGA_IMAGETYPE_UNCOMPRESSED_GRAY &&
+        desc->ImageType != data::TGA_IMAGETYPE_RLE_GRAY)
+        return false; // unsupported image type
+
+    uint8_t       *dstp = (uint8_t*) dst;
+    uint8_t       *endp = (uint8_t*) dst + desc->PixelDataSize;
+    uint8_t const *srcp = (uint8_t const*) desc->PixelData;
+
+    if (desc->ImageType == data::TGA_IMAGETYPE_UNCOMPRESSED_GRAY)
+    {   // super-easy path, this is just a memcpy.
+        memcpy(dstp, srcp, desc->PixelDataSize);
+        return true;
+    }
+    else
+    {   // slightly more complex; RLE-encoded data.
+        while (dstp <= endp)
+        {
+            uint8_t hdr = *srcp++;
+            uint8_t rl  = (hdr & 0x7F) + 1;
+            if (hdr & 0x80)
+            {   // this is an RLE-encoded packet.
+                uint8_t cv = *srcp++;
+                while  (rl > 0)
+                {
+                    *dstp++ = cv;
+                    --rl;
+                }
+            }
+            else
+            {   // standard non-RLE packet.
+                while (rl > 0)
+                {
+                    *dstp++ = *srcp++;
+                    --rl;
+                }
+            }
+        }
+    }
+    return true;
+}
+
+bool data::tga_decode_argb32(void *dst, size_t dst_size, data::tga_desc_t const *desc)
+{
+    if (desc == NULL || desc->PixelDataSize == 0 || desc->PixelData == NULL)
+        return false; // invalid image description
+    if (dst  == NULL || dst_size < desc->PixelDataSize)
+        return false; // invalid destination buffer
+
+    uint8_t       *dstp = (uint8_t*) dst;
+    uint8_t       *endp = (uint8_t*) dst + desc->PixelDataSize;
+    uint8_t const *srcp = (uint8_t const*) desc->PixelData;
+    size_t         srcb = 0;
+
+    switch (desc->ImageType)
+    {
+        case data::TGA_IMAGETYPE_UNCOMPRESSED_TRUE:
+            {
+                if (desc->BitsPerPixel == 24)
+                {   // we need to convert RGB8 => ARGB8.
+                    for (size_t row = 0; row < desc->ImageHeight; ++row)
+                    {
+                        for (size_t col = 0; col < desc->ImageWidth; ++col)
+                        {
+                            *dstp++ = srcp[srcb + 2];
+                            *dstp++ = srcp[srcb + 1];
+                            *dstp++ = srcp[srcb + 0];
+                            *dstp++ = 0xFF;
+                            srcb   += 3;
+                        }
+                    }
+                    return true;
+                }
+                if (desc->BitsPerPixel == 32)
+                {   // we need to convert RGBA8 => ARGB8.
+                    for (size_t row = 0; row < desc->ImageHeight; ++row)
+                    {
+                        for (size_t col = 0; col < desc->ImageWidth; ++col)
+                        {
+                            *dstp++ = srcp[srcb + 2];
+                            *dstp++ = srcp[srcb + 1];
+                            *dstp++ = srcp[srcb + 0];
+                            *dstp++ = srcp[srcb + 3];
+                            srcb   += 4;
+                        }
+                    }
+                    return true;
+                }
+
+            }
+            break; // 15 & 16bpp currently not supported.
+
+        case data::TGA_IMAGETYPE_RLE_TRUE:
+            {
+                if (desc->BitsPerPixel == 24)
+                {   // we need to decode and convert RGB8 => ARGB8.
+                    while (dstp <= endp)
+                    {
+                        uint8_t hdr = *srcp++;
+                        uint8_t rl  = (hdr & 0x7F) + 1;
+                        if (hdr & 0x80)
+                        {   // this is an RLE-encoded packet.
+                            uint8_t cr = *srcp++;
+                            uint8_t cg = *srcp++;
+                            uint8_t cb = *srcp++;
+                            while  (rl > 0)
+                            {
+                                *dstp++ = cb;
+                                *dstp++ = cg;
+                                *dstp++ = cr;
+                                *dstp++ = 0xFF;
+                                --rl;
+                            }
+                        }
+                        else
+                        {   // standard non-RLE packet.
+                            while (rl > 0)
+                            {
+                                uint8_t cr = *srcp++;
+                                uint8_t cg = *srcp++;
+                                uint8_t cb = *srcp++;
+                                *dstp++ = cb;
+                                *dstp++ = cg;
+                                *dstp++ = cr;
+                                *dstp++ = 0xFF;
+                                --rl;
+                            }
+                        }
+                    }
+                    return true;
+                }
+                if (desc->BitsPerPixel == 32)
+                {   // we need to decode and convert RGBA8 => ARGB8.
+                    while (dstp <= endp)
+                    {
+                        uint8_t hdr = *srcp++;
+                        uint8_t rl  = (hdr & 0x7F) + 1;
+                        if (hdr & 0x80)
+                        {   // this is an RLE-encoded packet.
+                            uint8_t cr = *srcp++;
+                            uint8_t cg = *srcp++;
+                            uint8_t cb = *srcp++;
+                            uint8_t ca = *srcp++;
+                            while  (rl > 0)
+                            {
+                                *dstp++ = cb;
+                                *dstp++ = cg;
+                                *dstp++ = cr;
+                                *dstp++ = ca;
+                                --rl;
+                            }
+                        }
+                        else
+                        {   // standard non-RLE packet.
+                            while (rl > 0)
+                            {
+                                uint8_t cr = *srcp++;
+                                uint8_t cg = *srcp++;
+                                uint8_t cb = *srcp++;
+                                uint8_t ca = *srcp++;
+                                *dstp++ = cb;
+                                *dstp++ = cg;
+                                *dstp++ = cr;
+                                *dstp++ = ca;
+                                --rl;
+                            }
+                        }
+                    }
+                    return true;
+                }
+            }
+            break;
+
+        default:
+            break;
+    }
+
+    // unsupported format (15 or 16bpp, or palettized).
     return false;
 }

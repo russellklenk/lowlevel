@@ -397,10 +397,10 @@ enum tga_imagetype_e
     TGA_IMAGETYPE_NO_IMAGE_DATA             = 0,
     TGA_IMAGETYPE_UNCOMPRESSED_PAL          = 1,
     TGA_IMAGETYPE_UNCOMPRESSED_TRUE         = 2,
-    TGA_IMAGETYPE_UNCOMPRESSED_BW           = 3,
+    TGA_IMAGETYPE_UNCOMPRESSED_GRAY         = 3,
     TGA_IMAGETYPE_RLE_PAL                   = 9,
     TGA_IMAGETYPE_RLE_TRUE                  = 10,
-    TGA_IMAGETYPE_RLE_BW                    = 11
+    TGA_IMAGETYPE_RLE_GRAY                  = 11
 };
 
 /// @summary Defines the recognized compression types.
@@ -758,7 +758,7 @@ struct tga_desc_t
     size_t   ImageWidth;      /// The width of the image, in pixels.
     size_t   ImageHeight;     /// The height of the image, in pixels.
     size_t   BitsPerPixel;    /// The number of bits per-pixel, including alpha.
-    size_t   PixelDataSize;   /// The size of the pixel data block, in bytes.
+    size_t   PixelDataSize;   /// Buffer size required to store decoded pixel data.
     size_t   ColormapDataSize;/// The size of the colormap data block, in bytes.
     void    *ColormapData;    /// Pointer to the start of the colormap data.
     void    *PixelData;       /// Pointer to the start of the image data.
@@ -1079,6 +1079,26 @@ LLDATAIN_PUBLIC bool tga_footer(void const *data, size_t data_size, data::tga_fo
 /// @param out_desc On return, this structure is populated with information about the image.
 /// @return true if the image was parsed successfully.
 LLDATAIN_PUBLIC bool tga_describe(void const *data, size_t data_size, data::tga_desc_t *out_desc);
+
+/// @summary Decodes 8-bit grayscale TGA data into a caller-managed buffer. The
+/// TGA may have image type TGA_IMAGETYPE_UNCOMPRESSED_GRAY or TGA_IMAGETYPE_RLE_GRAY.
+/// Any other image type will cause the call to fail.
+/// @param dst The buffer to write to, of at least ImageWidth * ImageHeight bytes.
+/// @param dst_size The maximum number of bytes to write to the destination buffer.
+/// @param desc A description of the data in the TGA image.
+/// @return true if the image data was decoded and written to the output buffer.
+LLDATAIN_PUBLIC bool tga_decode_r8(void *dst, size_t dst_size, data::tga_desc_t const *desc);
+
+/// @summary Decodes 16/24/32 bit TGA data into a caller-managed buffer. Pixels
+/// are logically stored in ARGB order, but on a little-endian machine appear
+/// in BGRA byte order. Use GL_BGRA/GL_UNSIGNED_INT_8_8_8_8_REV to upload this
+/// data to OpenGL most efficiently. Uncompressed, palettized and RLE-encoded
+/// images are supported, but grayscale images should use tga_decode_r8().
+/// @param dst The buffer to write to, of at least ImageWidth * ImageHeight * 4 bytes.
+/// @param dst_size The maximum number of bytes to write to the destination buffer.
+/// @param desc A description of the data in the TGA image.
+/// @return true if the image data was decoded and written to the output buffer.
+LLDATAIN_PUBLIC bool tga_decode_argb32(void *dst, size_t dst_size, data::tga_desc_t const *desc);
 
 /// @summary Generates a little-endian FOURCC.
 /// @param a...d The four characters comprising the code.
