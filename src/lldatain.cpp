@@ -2172,7 +2172,6 @@ bmfont_error:
 
 bool data::tga_header(void const *data, size_t data_size, data::tga_header_t *out_header)
 {
-    uint8_t const *base_ptr   = (uint8_t const*) data;
     uint8_t const *header_ptr = (uint8_t const*) data;
     size_t         min_size   = sizeof(data::tga_header_t);
 
@@ -2328,7 +2327,7 @@ bool data::tga_decode_r8(void *dst, size_t dst_size, data::tga_desc_t const *des
     }
     else
     {   // slightly more complex; RLE-encoded data.
-        while (dstp <= endp)
+        while (dstp < endp)
         {
             uint8_t hdr = *srcp++;
             uint8_t rl  = (hdr & 0x7F) + 1;
@@ -2408,7 +2407,7 @@ bool data::tga_decode_argb32(void *dst, size_t dst_size, data::tga_desc_t const 
             {
                 if (desc->BitsPerPixel == 24)
                 {   // we need to decode and convert RGB8 => ARGB8.
-                    while (dstp <= endp)
+                    while (dstp < endp)
                     {
                         uint8_t hdr = *srcp++;
                         uint8_t rl  = (hdr & 0x7F) + 1;
@@ -2445,7 +2444,7 @@ bool data::tga_decode_argb32(void *dst, size_t dst_size, data::tga_desc_t const 
                 }
                 if (desc->BitsPerPixel == 32)
                 {   // we need to decode and convert RGBA8 => ARGB8.
-                    while (dstp <= endp)
+                    while (dstp < endp)
                     {
                         uint8_t hdr = *srcp++;
                         uint8_t rl  = (hdr & 0x7F) + 1;
