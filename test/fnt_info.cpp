@@ -47,7 +47,7 @@ static const data::bmfont_content_e CONTENT_VALUES[CONTENT_COUNT] =
 /*///////////////////////
 //   Local Functions   //
 ///////////////////////*/
-static char const* channel_str(uint8_t channel)
+static char const* channel_str(uint32_t channel)
 {
     switch (channel)
     {
@@ -67,7 +67,7 @@ static char const* channel_str(uint8_t channel)
     return "UNKNOWN";
 }
 
-static char const* attrib_str(uint8_t attribs)
+static char const* attrib_str(uint32_t attribs)
 {
     switch (attribs)
     {
@@ -89,7 +89,7 @@ static char const* attrib_str(uint8_t attribs)
     return "UNKNOWN";
 }
 
-static char const* content_str(uint8_t channel)
+static char const* content_str(uint32_t channel)
 {
     switch (channel)
     {

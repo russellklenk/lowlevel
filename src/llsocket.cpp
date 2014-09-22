@@ -232,7 +232,7 @@ bool network::stream_listen(
         // wait for the operating system timeout to occur.
         setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (char*) &yes, sizeof(yes));
         // bind to the specified address/port.
-        res = bind(sock, iter->ai_addr, iter->ai_addrlen);
+        res = bind(sock, iter->ai_addr, int(iter->ai_addrlen));
         if (network::socket_error(res))
         {
             network::stream_close(sock);
@@ -375,7 +375,7 @@ bool network::stream_connect(
     {
         sock  = socket(iter->ai_family, iter->ai_socktype, iter->ai_protocol);
         if (INVALID_SOCKET_ID == sock) continue;
-        res   = connect(sock, iter->ai_addr, iter->ai_addrlen);
+        res   = connect(sock, iter->ai_addr, int(iter->ai_addrlen));
         if (network::socket_error(res))
         {
             network::stream_close(sock);
@@ -646,7 +646,7 @@ size_t network::stream_write(
         }
 
         // attempt to send as much data as we can write to the socket.
-        int n_to_send   = (int) bytes_total - bytes_sent;
+        int n_to_send   = (int) bytes_total - (int) bytes_sent;
         int n_sent      = send(sockfd, buf, n_to_send, 0);
         if (!network::socket_error(n_sent) && n_sent > 0)
         {

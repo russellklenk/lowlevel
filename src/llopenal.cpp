@@ -176,7 +176,7 @@ void al::buffer_data(al::buffer_t *buffer, void const *data, size_t amount)
 {
     size_t bps = buffer->BitsPerSample * buffer->SampleRate * buffer->ChannelCount;
     float  len = float(amount) / float(bps / 8);
-    alBufferData(buffer->Id, buffer->Format, data, amount, buffer->SampleRate);
+    alBufferData(buffer->Id, buffer->Format, data, ALsizei(amount), ALsizei(buffer->SampleRate));
     buffer->DataSize = amount;
     buffer->Duration = len;
 }
@@ -303,7 +303,7 @@ bool al::create_buffer_pool(al::buffer_pool_t *pool, size_t capacity, size_t cha
             pool->FreeIds = (ALuint*)       malloc(capacity * sizeof(ALuint));
             pool->Buffers = (al::buffer_t*) malloc(capacity * sizeof(al::buffer_t));
 
-            alGenBuffers(capacity, pool->FreeIds);
+            alGenBuffers(ALsizei(capacity), pool->FreeIds);
             for (size_t i = 0; i < capacity; ++i)
             {
                 al::buffer_t &bo = pool->Buffers[i];
@@ -345,8 +345,8 @@ void al::delete_buffer_pool(al::buffer_pool_t *pool)
 {
     if (pool)
     {
-        if (pool->UsedCount > 0) alDeleteBuffers(pool->UsedCount, pool->UsedIds);
-        if (pool->FreeCount > 0) alDeleteBuffers(pool->FreeCount, pool->FreeIds);
+        if (pool->UsedCount > 0) alDeleteBuffers(ALsizei(pool->UsedCount), pool->UsedIds);
+        if (pool->FreeCount > 0) alDeleteBuffers(ALsizei(pool->FreeCount), pool->FreeIds);
         if (pool->Buffers)       free(pool->Buffers);
         if (pool->FreeIds)       free(pool->FreeIds);
         if (pool->UsedIds)       free(pool->UsedIds);
@@ -425,7 +425,7 @@ bool al::create_source_pool(al::source_pool_t *pool, size_t capacity)
             pool->FreeIds = (ALuint*)       malloc(capacity * sizeof(ALuint));
             pool->Sources = (al::source_t*) malloc(capacity * sizeof(al::source_t));
 
-            alGenSources(capacity, pool->FreeIds);
+            alGenSources(ALsizei(capacity), pool->FreeIds);
             for (size_t i = 0; i < capacity; ++i)
             {
                 al::source_t &so = pool->Sources[i];
@@ -478,9 +478,9 @@ void al::delete_source_pool(al::source_pool_t *pool)
                 alSourceStop(pool->UsedIds[i]);
                 alSourcei(pool->UsedIds[i], AL_BUFFER, 0);
             }
-            alDeleteSources(pool->UsedCount, pool->UsedIds);
+            alDeleteSources(ALsizei(pool->UsedCount), pool->UsedIds);
         }
-        if (pool->FreeCount > 0) alDeleteBuffers(pool->FreeCount, pool->FreeIds);
+        if (pool->FreeCount > 0) alDeleteBuffers(ALsizei(pool->FreeCount), pool->FreeIds);
         if (pool->Sources)       free(pool->Sources);
         if (pool->FreeIds)       free(pool->FreeIds);
         if (pool->UsedIds)       free(pool->UsedIds);

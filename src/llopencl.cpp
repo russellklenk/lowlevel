@@ -219,7 +219,7 @@ void cl::device_caps_info(cl::device_caps_t *caps, cl_device_id const &device)
     clGetDeviceInfo(device, CL_DEVICE_PREFERRED_VECTOR_WIDTH_FLOAT,  sizeof(caps->VecWidthSingle),   &caps->VecWidthSingle,   NULL);
     clGetDeviceInfo(device, CL_DEVICE_PREFERRED_VECTOR_WIDTH_DOUBLE, sizeof(caps->VecWidthDouble),   &caps->VecWidthDouble,   NULL);
     clGetDeviceInfo(device, CL_DEVICE_SINGLE_FP_CONFIG,              sizeof(caps->FPSingleConfig),   &caps->FPSingleConfig,   NULL);
-    clGetDeviceInfo(device, CL_DEVICE_DOUBLE_FP_CONFIG,              sizeof(caps->FPDoubleConfig),   &caps->FPDoubleConfig,   NULL);
+    //clGetDeviceInfo(device, CL_DEVICE_DOUBLE_FP_CONFIG,              sizeof(caps->FPDoubleConfig),   &caps->FPDoubleConfig,   NULL);
     clGetDeviceInfo(device, CL_DEVICE_QUEUE_PROPERTIES,              sizeof(caps->CmdQueueConfig),   &caps->CmdQueueConfig,   NULL);
     clGetDeviceInfo(device, CL_DEVICE_IMAGE_SUPPORT,                 sizeof(caps->SupportImage),     &caps->SupportImage,     NULL);
     clGetDeviceInfo(device, CL_DEVICE_IMAGE2D_MAX_WIDTH,             sizeof(caps->MaxWidth2D),       &caps->MaxWidth2D,       NULL);

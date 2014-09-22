@@ -132,7 +132,7 @@ struct attribute_desc_t
     GLint   Location;     /// The assigned location within the program
     size_t  DataSize;     /// The size of the attribute data, in bytes
     size_t  DataOffset;   /// The offset of the attribute data, in bytes
-    size_t  Dimension;    /// The data dimension, for array types
+    GLsizei Dimension;    /// The data dimension, for array types
 };
 
 /// @summary Describes an active GLSL sampler.
@@ -151,7 +151,7 @@ struct uniform_desc_t
     GLint   Location;     /// The assigned location within the program
     size_t  DataSize;     /// The size of the uniform data, in bytes
     size_t  DataOffset;   /// The offset of the uniform data, in bytes
-    size_t  Dimension;    /// The data dimension, for array types
+    GLsizei Dimension;    /// The data dimension, for array types
 };
 
 /// @summary Describes a successfully compiled and linked GLSL shader program.

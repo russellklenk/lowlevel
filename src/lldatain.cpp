@@ -1056,7 +1056,7 @@ uint32_t data::dds_format(data::dds_header_t const *header, data::dds_header_dxt
     return data::DXGI_FORMAT_UNKNOWN;
 }
 
-size_t data::dds_pitch(uint32_t format, uint32_t width)
+size_t data::dds_pitch(uint32_t format, size_t width)
 {
     if (data::dds_block_compressed(format))
     {

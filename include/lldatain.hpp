@@ -884,7 +884,7 @@ LLDATAIN_PUBLIC uint32_t dds_format(data::dds_header_t const *header, data::dds_
 /// writers do not correctly compute the pitch value. See MSDN documentation at:
 /// http://msdn.microsoft.com/en-us/library/windows/desktop/bb943991(v=vs.85).aspx
 /// @param format One of the values of the dxgi_format_e enumeration.
-LLDATAIN_PUBLIC size_t dds_pitch(uint32_t format, uint32_t width);
+LLDATAIN_PUBLIC size_t dds_pitch(uint32_t format, size_t width);
 
 /// @summary Determines if a DXGI format value is a block-compressed format.
 /// @param format One of dxgi_format_e.

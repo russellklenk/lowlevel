@@ -195,7 +195,7 @@ bool gl::compile_shader(
         if (out_log_size) *out_log_size = 1;
         return false;
     }
-    glShaderSource (shader, string_count, (GLchar const**) shader_source, NULL);
+    glShaderSource (shader, GLsizei(string_count), (GLchar const**) shader_source, NULL);
     glCompileShader(shader);
     glGetShaderiv  (shader, GL_COMPILE_STATUS,  &result);
     glGetShaderiv  (shader, GL_INFO_LOG_LENGTH, &log_size);
@@ -650,7 +650,7 @@ void gl::shader_source_add(gl::shader_source_t *source, GLenum shader_stage, cha
     if (source->StageCount < GL_MAX_SHADER_STAGES)
     {
         source->StageNames [source->StageCount] = shader_stage;
-        source->StringCount[source->StageCount] = string_count;
+        source->StringCount[source->StageCount] = GLsizei(string_count);
         source->SourceCode [source->StageCount] = source_code;
         source->StageCount++;
     }
@@ -1331,7 +1331,7 @@ void gl::texture_storage(
     if (target != GL_TEXTURE_RECTANGLE)
     {
         glTexParameteri(target, GL_TEXTURE_BASE_LEVEL, 0);
-        glTexParameteri(target, GL_TEXTURE_MAX_LEVEL,  max_levels - 1);
+        glTexParameteri(target, GL_TEXTURE_MAX_LEVEL,  GLint(max_levels - 1));
     }
     else
     {
@@ -1355,7 +1355,7 @@ void gl::texture_storage(
                     for (size_t lod = 0; lod < max_levels; ++lod)
                     {
                         size_t lw = gl::level_dimension(width, lod);
-                        glTexImage1D(target, lod, internal_format, lw, 0, base_fmt, data_type, NULL);
+                        glTexImage1D(target, GLint(lod), internal_format, GLsizei(lw), 0, base_fmt, data_type, NULL);
                     }
                 }
                 break;
@@ -1366,7 +1366,7 @@ void gl::texture_storage(
                     for (size_t lod = 0; lod < max_levels; ++lod)
                     {
                         size_t lw = gl::level_dimension(width, lod);
-                        glTexImage2D(target, lod, internal_format, lw, slice_count, 0, base_fmt, data_type, NULL);
+                        glTexImage2D(target, GLint(lod), internal_format, GLsizei(lw), GLsizei(slice_count), 0, base_fmt, data_type, NULL);
                     }
                 }
                 break;
@@ -1374,7 +1374,7 @@ void gl::texture_storage(
             case GL_TEXTURE_RECTANGLE:
                 {
                     // rectangle textures don't support mipmaps.
-                    glTexImage2D(target, 0, internal_format, width, height, 0, base_fmt, data_type, NULL);
+                    glTexImage2D(target, 0, internal_format, GLsizei(width), GLsizei(height), 0, base_fmt, data_type, NULL);
                 }
                 break;
 
@@ -1390,7 +1390,7 @@ void gl::texture_storage(
                     {
                         size_t lw = gl::level_dimension(width,  lod);
                         size_t lh = gl::level_dimension(height, lod);
-                        glTexImage2D(target, lod, internal_format, lw, lh, 0, base_fmt, data_type, NULL);
+                        glTexImage2D(target, GLint(lod), internal_format, GLsizei(lw), GLsizei(lh), 0, base_fmt, data_type, NULL);
                     }
                 }
                 break;
@@ -1403,7 +1403,7 @@ void gl::texture_storage(
                     {
                         size_t lw = gl::level_dimension(width,  lod);
                         size_t lh = gl::level_dimension(height, lod);
-                        glTexImage3D(target, lod, internal_format, lw, lh, slice_count, 0, base_fmt, data_type, NULL);
+                        glTexImage3D(target, GLint(lod), internal_format, GLsizei(lw), GLsizei(lh), GLsizei(slice_count), 0, base_fmt, data_type, NULL);
                     }
                 }
                 break;
@@ -1415,7 +1415,7 @@ void gl::texture_storage(
                         size_t lw = gl::level_dimension(width,       lod);
                         size_t lh = gl::level_dimension(height,      lod);
                         size_t ls = gl::level_dimension(slice_count, lod);
-                        glTexImage3D(target, lod, internal_format, lw, lh, ls, 0, base_fmt, data_type, NULL);
+                        glTexImage3D(target, GLint(lod), internal_format, GLsizei(lw), GLsizei(lh), GLsizei(ls), 0, base_fmt, data_type, NULL);
                     }
                 }
                 break;
@@ -1438,14 +1438,14 @@ void gl::transfer_pixels_d2h(gl::pixel_transfer_d2h_t *transfer)
     {
         // transferring into a sub-rectangle of the image; tell GL how
         // many pixels are in a single row of the target image.
-        glPixelStorei(GL_PACK_ROW_LENGTH,   transfer->TargetWidth);
-        glPixelStorei(GL_PACK_IMAGE_HEIGHT, transfer->TargetHeight);
+        glPixelStorei(GL_PACK_ROW_LENGTH,   GLint(transfer->TargetWidth));
+        glPixelStorei(GL_PACK_IMAGE_HEIGHT, GLint(transfer->TargetHeight));
     }
 
     // perform the setup necessary to have GL calculate any byte offsets.
-    if (transfer->TargetX != 0) glPixelStorei(GL_PACK_SKIP_PIXELS, transfer->TargetX);
-    if (transfer->TargetY != 0) glPixelStorei(GL_PACK_SKIP_ROWS,   transfer->TargetY);
-    if (transfer->TargetZ != 0) glPixelStorei(GL_PACK_SKIP_IMAGES, transfer->TargetZ);
+    if (transfer->TargetX != 0) glPixelStorei(GL_PACK_SKIP_PIXELS, GLint(transfer->TargetX));
+    if (transfer->TargetY != 0) glPixelStorei(GL_PACK_SKIP_ROWS,   GLint(transfer->TargetY));
+    if (transfer->TargetZ != 0) glPixelStorei(GL_PACK_SKIP_IMAGES, GLint(transfer->TargetZ));
 
     if (gl::bytes_per_block(transfer->Format) > 0)
     {
@@ -1464,7 +1464,7 @@ void gl::transfer_pixels_d2h(gl::pixel_transfer_d2h_t *transfer)
                 {
                     glGetCompressedTexImage(
                         transfer->Target,
-                        transfer->SourceIndex,
+                        GLint(transfer->SourceIndex),
                         transfer->TransferBuffer);
                 }
                 break;
@@ -1480,10 +1480,10 @@ void gl::transfer_pixels_d2h(gl::pixel_transfer_d2h_t *transfer)
                 {
                     // remember, x and y identify the lower-left corner.
                     glReadPixels(
-                        transfer->TransferX,
-                        transfer->TransferY,
-                        transfer->TransferWidth,
-                        transfer->TransferHeight,
+                        GLint(transfer->TransferX),
+                        GLint(transfer->TransferY),
+                        GLint(transfer->TransferWidth),
+                        GLint(transfer->TransferHeight),
                         transfer->Format,
                         transfer->DataType,
                         transfer->TransferBuffer);
@@ -1505,7 +1505,7 @@ void gl::transfer_pixels_d2h(gl::pixel_transfer_d2h_t *transfer)
                 {
                     glGetTexImage(
                         transfer->Target,
-                        transfer->SourceIndex,
+                        GLint(transfer->SourceIndex),
                         transfer->Format,
                         transfer->DataType,
                         transfer->TransferBuffer);
@@ -1543,19 +1543,19 @@ void gl::transfer_pixels_h2d(gl::pixel_transfer_h2d_t *transfer)
     {
         // transferring a sub-rectangle of the image; tell GL how many
         // pixels are in a single row of the source image.
-        glPixelStorei(GL_UNPACK_ROW_LENGTH, transfer->SourceWidth);
+        glPixelStorei(GL_UNPACK_ROW_LENGTH, GLint(transfer->SourceWidth));
     }
     if (transfer->TransferSlices > 1)
     {
         // transferring an image volume; tell GL how many rows per-slice
         // in the source image, since we may only be transferring a sub-volume.
-        glPixelStorei(GL_UNPACK_IMAGE_HEIGHT, transfer->SourceHeight);
+        glPixelStorei(GL_UNPACK_IMAGE_HEIGHT, GLint(transfer->SourceHeight));
     }
 
     // perform the setup necessary to have GL calculate any byte offsets.
-    if (transfer->SourceX != 0) glPixelStorei(GL_UNPACK_SKIP_PIXELS, transfer->SourceX);
-    if (transfer->SourceY != 0) glPixelStorei(GL_UNPACK_SKIP_ROWS,   transfer->SourceY);
-    if (transfer->SourceZ != 0) glPixelStorei(GL_UNPACK_SKIP_IMAGES, transfer->SourceZ);
+    if (transfer->SourceX != 0) glPixelStorei(GL_UNPACK_SKIP_PIXELS, GLint(transfer->SourceX));
+    if (transfer->SourceY != 0) glPixelStorei(GL_UNPACK_SKIP_ROWS,   GLint(transfer->SourceY));
+    if (transfer->SourceZ != 0) glPixelStorei(GL_UNPACK_SKIP_IMAGES, GLint(transfer->SourceZ));
 
     if (gl::bytes_per_block(transfer->Format) > 0)
     {
@@ -1566,11 +1566,11 @@ void gl::transfer_pixels_h2d(gl::pixel_transfer_h2d_t *transfer)
                 {
                     glCompressedTexSubImage1D(
                         transfer->Target,
-                        transfer->TargetIndex,
-                        transfer->TargetX,
-                        transfer->TransferWidth,
+                        GLint(transfer->TargetIndex),
+                        GLint(transfer->TargetX),
+                        GLsizei(transfer->TransferWidth),
                         transfer->Format,
-                        transfer->TransferSize,
+                        GLsizei(transfer->TransferSize),
                         transfer->TransferBuffer);
                 }
                 break;
@@ -1587,13 +1587,13 @@ void gl::transfer_pixels_h2d(gl::pixel_transfer_h2d_t *transfer)
                 {
                     glCompressedTexSubImage2D(
                         transfer->Target,
-                        transfer->TargetIndex,
-                        transfer->TargetX,
-                        transfer->TargetY,
-                        transfer->TransferWidth,
-                        transfer->TransferHeight,
+                        GLint(transfer->TargetIndex),
+                        GLint(transfer->TargetX),
+                        GLint(transfer->TargetY),
+                        GLsizei(transfer->TransferWidth),
+                        GLsizei(transfer->TransferHeight),
                         transfer->Format,
-                        transfer->TransferSize,
+                        GLsizei(transfer->TransferSize),
                         transfer->TransferBuffer);
                 }
                 break;
@@ -1603,15 +1603,15 @@ void gl::transfer_pixels_h2d(gl::pixel_transfer_h2d_t *transfer)
                 {
                     glCompressedTexSubImage3D(
                         transfer->Target,
-                        transfer->TargetIndex,
-                        transfer->TargetX,
-                        transfer->TargetY,
-                        transfer->TargetZ,
-                        transfer->TransferWidth,
-                        transfer->TransferHeight,
-                        transfer->TransferSlices,
+                        GLint(transfer->TargetIndex),
+                        GLint(transfer->TargetX),
+                        GLint(transfer->TargetY),
+                        GLint(transfer->TargetZ),
+                        GLsizei(transfer->TransferWidth),
+                        GLsizei(transfer->TransferHeight),
+                        GLsizei(transfer->TransferSlices),
                         transfer->Format,
-                        transfer->TransferSize,
+                        GLsizei(transfer->TransferSize),
                         transfer->TransferBuffer);
                 }
                 break;
@@ -1626,9 +1626,9 @@ void gl::transfer_pixels_h2d(gl::pixel_transfer_h2d_t *transfer)
                 {
                     glTexSubImage1D(
                         transfer->Target,
-                        transfer->TargetIndex,
-                        transfer->TargetX,
-                        transfer->TransferWidth,
+                        GLint(transfer->TargetIndex),
+                        GLint(transfer->TargetX),
+                        GLsizei(transfer->TransferWidth),
                         transfer->Format,
                         transfer->DataType,
                         transfer->TransferBuffer);
@@ -1647,11 +1647,11 @@ void gl::transfer_pixels_h2d(gl::pixel_transfer_h2d_t *transfer)
                 {
                     glTexSubImage2D(
                         transfer->Target,
-                        transfer->TargetIndex,
-                        transfer->TargetX,
-                        transfer->TargetY,
-                        transfer->TransferWidth,
-                        transfer->TransferHeight,
+                        GLint(transfer->TargetIndex),
+                        GLint(transfer->TargetX),
+                        GLint(transfer->TargetY),
+                        GLsizei(transfer->TransferWidth),
+                        GLsizei(transfer->TransferHeight),
                         transfer->Format,
                         transfer->DataType,
                         transfer->TransferBuffer);
@@ -1663,13 +1663,13 @@ void gl::transfer_pixels_h2d(gl::pixel_transfer_h2d_t *transfer)
                 {
                     glTexSubImage3D(
                         transfer->Target,
-                        transfer->TargetIndex,
-                        transfer->TargetX,
-                        transfer->TargetY,
-                        transfer->TargetZ,
-                        transfer->TransferWidth,
-                        transfer->TransferHeight,
-                        transfer->TransferSlices,
+                        GLint(transfer->TargetIndex),
+                        GLint(transfer->TargetX),
+                        GLint(transfer->TargetY),
+                        GLint(transfer->TargetZ),
+                        GLsizei(transfer->TransferWidth),
+                        GLsizei(transfer->TransferHeight),
+                        GLsizei(transfer->TransferSlices),
                         transfer->Format,
                         transfer->DataType,
                         transfer->TransferBuffer);
@@ -1784,7 +1784,7 @@ void gl::generate_quads(
         r.LayerDepth  = s.LayerDepth;
         r.RenderState = s.RenderState;
 
-        indices[qindex] = qindex;
+        indices[qindex] = uint32_t(qindex);
     }
 }
 
@@ -1884,8 +1884,8 @@ bool gl::create_sprite_effect(gl::sprite_effect_t *effect, size_t quad_count, si
     GLuint  buffers[2] = {0, 0};
     size_t  vcount     = quad_count  * 4;
     size_t  icount     = quad_count  * 6;
-    GLsizei abo_size   = vertex_size * vcount;
-    GLsizei eao_size   = index_size  * icount;
+    GLsizei abo_size   = GLsizei(vertex_size * vcount);
+    GLsizei eao_size   = GLsizei(index_size  * icount);
 
     glGenBuffers(2, buffers);
     glBindBuffer(GL_ARRAY_BUFFER, buffers[0]);
@@ -2048,8 +2048,8 @@ size_t gl::sprite_effect_buffer_data_ptc(
     {
         // the buffer is completely full. time to discard it and
         // request a new buffer from the driver, to avoid stalls.
-        GLsizei abo_size     = effect->VertexCapacity * effect->VertexSize;
-        GLsizei eao_size     = effect->IndexCapacity  * effect->IndexSize;
+        GLsizei abo_size     = GLsizei(effect->VertexCapacity * effect->VertexSize);
+        GLsizei eao_size     = GLsizei(effect->IndexCapacity  * effect->IndexSize);
         effect->VertexOffset = 0;
         effect->IndexOffset  = 0;
         glBufferData(GL_ARRAY_BUFFER, abo_size, NULL, GL_DYNAMIC_DRAW);
@@ -2141,7 +2141,7 @@ void gl::sprite_effect_draw_batch_region_ptc(
     size_t   nquad   = 0; // count of quads in sub-batch
     size_t   nindex  = 0; // count of indices in sub-batch
     size_t   quad_id = 0; // quad insertion index
-    GLsizei  size    = effect->IndexSize;
+    GLsizei  size    = GLsizei(effect->IndexSize);
     GLenum   type    = size == 2 ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
 
     for (size_t i = 0; i < quad_count; ++i)
@@ -2156,7 +2156,7 @@ void gl::sprite_effect_draw_batch_region_ptc(
             {
                 nquad  = i - index;  // the number of quads being submitted
                 nindex = nquad * 6;  // the number of indices being submitted
-                glDrawElements(GL_TRIANGLES, nindex, type, GL_BUFFER_OFFSET(base_index * size));
+                glDrawElements(GL_TRIANGLES, GLsizei(nindex), type, GL_BUFFER_OFFSET(base_index * size));
                 base_index += nindex;
             }
             // now apply the new state and start a new sub-batch.
@@ -2168,7 +2168,7 @@ void gl::sprite_effect_draw_batch_region_ptc(
     // submit the remainder of the sub-batch.
     nquad  = quad_count - index;
     nindex = nquad * 6;
-    glDrawElements(GL_TRIANGLES, nindex, type, GL_BUFFER_OFFSET(base_index * size));
+    glDrawElements(GL_TRIANGLES, GLsizei(nindex), type, GL_BUFFER_OFFSET(base_index * size));
     effect->CurrentState = state_1;
 }
 
