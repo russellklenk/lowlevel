@@ -12,6 +12,7 @@
 //   Includes   //
 ////////////////*/
 #include <stddef.h>
+#include <stdint.h>
 
 /*////////////////////
 //   Preprocessor   //
@@ -61,7 +62,6 @@ namespace gui {
 //   Data Types  //
 /////////////////*/
 /// @summary Defines the data associated with a single glyph in a bitmap font.
-/// This structure is almost identical to bmfont_char_t, but without the packing restrictions.
 struct bitmap_glyph_t
 {
     uint32_t        Codepoint;  /// The Unicode codepoint associated with the glyph.
@@ -75,12 +75,12 @@ struct bitmap_glyph_t
     uint8_t         PageIndex;  /// The index of the page containing the glyph data.
 };
 
-/// @summary Defines the data associated with a bitmap font. This data is
-/// typically loaded from a BMFont binary file.
+/// @summary Defines the data associated with a bitmap font.
 struct bitmap_font_t
 {
     size_t          GlyphCount; /// The number of glyphs defined in the font.
-    size_t        **GTable;     /// Table mapping Unicode codepoint -> index in Glyphs.
+    size_t          BucketCount;/// The number of buckets in the glyph table.
+    uint32_t      **GTable;     /// Table mapping Unicode codepoint -> index in Glyphs.
     bitmap_glyph_t *Glyphs;     /// List of glyph definitions.
     size_t          KernCount;  /// The number of entries in the kerning table.
     uint32_t       *KerningA;   /// Codepoints of the first glyph in a kerning pair.
@@ -101,9 +101,77 @@ struct bitmap_font_t
     float           AvgWidth;   /// The average width of a glyph in the font.
 };
 
+/// @summary Defines the data necessary to allocate storage for a bitmap font.
+struct bitmap_font_info_t
+{
+    size_t          GlyphCount; /// The number of glyphs defined in the font.
+    size_t          KernCount;  /// The number of kerning table entries.
+    size_t          BitDepth;   /// The bits-per-pixel of the image data, either 8 or 32.
+    size_t          PageWidth;  /// The width of a single texture page, in pixels.
+    size_t          PageHeight; /// The height of a single texture page, in pixels.
+    size_t          PageCount;  /// The number of texture pages containing glyphs.
+    char const     *FontName;   /// An optional font name, may be NULL.
+    size_t          PointSize;  /// The font size, in points.
+    size_t          LineHeight; /// The number of vertical pixels between two lines.
+    size_t          Baseline;   /// The number of pixels from the top of a line to the common base.
+};
+
 /*////////////////
 //   Functions  //
 ////////////////*/
+/// @summary Initializes the fields of a bitmap_font_info_t structure to their defaults.
+/// @param info The structure to initialize.
+LLGUI_PUBLIC void init_bitmap_font_info(gui::bitmap_font_info_t *info);
+
+/// @summary Allocates storage for a bitmap font.
+/// @param font The bitmap font to initialize.
+/// @param info Information about the font provided by the application.
+/// @return true if font storage was initialized.
+LLGUI_PUBLIC bool create_bitmap_font(gui::bitmap_font_t *font, gui::bitmap_font_info_t const *info);
+
+/// @summary Releases storage allocated for a bitmap font.
+/// @param font The font to delete.
+LLGUI_PUBLIC void delete_bitmap_font(gui::bitmap_font_t *font);
+
+/// @summary Defines a single glyph within a bitmap font.
+/// @param font The font to update.
+/// @param glyph The glyph definition.
+/// @param i The zero-based index of the glyph, in [0, font->GlyphCount).
+/// @return true if the glyph definition was stored within the font.
+LLGUI_PUBLIC bool define_glyph(gui::bitmap_font_t *font, gui::bitmap_glyph_t const *glyph, size_t i);
+
+/// @summary Defines a single kerning entry within a bitmap font.
+/// @param font The font to update.
+/// @param codepoint_a The codepoint of the first glyph.
+/// @param codepoint_b The codepoint of the second glyph.
+/// @param advance_x The amount to advance the cursor on the x-axis after drawing
+/// glyph A, when glyph B immediately follows it.
+/// @param i The zero-based index of the kerning entry, in [0, font->KernCount).
+/// @return true if the kerning definition was stored within the font.
+LLGUI_PUBLIC bool define_kerning(gui::bitmap_font_t *font, uint32_t codepoint_a, uint32_t codepoint_b, int32_t advance_x, size_t i);
+
+/// @summary Copies the image data for a glyph page.
+/// @param font The font to update.
+/// @param src The image data for the page.
+/// @param src_size The size of the image data, in bytes. 
+/// @param i The zero-based index of the page to update, in [0, font->PageCount).
+/// @param flip_y Specify true to flip the page data.
+/// @return true if the image data was copied to the font.
+LLGUI_PUBLIC bool define_page(gui::bitmap_font_t *font, void const *src, size_t src_size, size_t i, bool flip_y);
+
+/// @summary Retrieves a pointer to the image data for a glyph page. The page is
+/// font->PageBytes bytes in length, and will be either R8 or ARGB8 data.
+/// @param font The font to query.
+/// @param i The zero-based index of the page to retrieve, in [0, font->PageCount).
+/// @return A pointer to the page image data, or NULL.
+LLGUI_PUBLIC void* glyph_page(gui::bitmap_font_t const *font, size_t i);
+
+/// @summary Calculates the dimensions of a string when rendered with a given font.
+/// @param font The font definition to use.
+/// @param str A NULL-terminated UTF-8 string.
+/// @param out_w On return, this location stores the width of the string, in pixels.
+/// @param out_h On return, this location stores the height of the string, in pixels.
+LLGUI_PUBLIC void measure_string(gui::bitmap_font_t const *font, char const *str, size_t *out_w, size_t *out_h);
 
 /*/////////////////////
 //   Namespace End   //
