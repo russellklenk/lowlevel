@@ -39,7 +39,7 @@ test/fntinfo.exe: ${TEST_OBJECTS}
 	${CC} ${LDFLAGS} ${TEST_LDFLAGS} -o $@ test/fnt_info.o ${TEST_LIBRARIES}
 
 test/tgainfo.exe: ${TEST_OBJECTS}
-    ${CC} ${LDFLAGS} ${TEST_LDFLAGS} -o $@ test/tga_info.o ${TEST_LIBRARIES}
+	${CC} ${LDFLAGS} ${TEST_LDFLAGS} -o $@ test/tga_info.o ${TEST_LIBRARIES}
 
 ${TEST_OBJECTS}: %.o: %.cpp ${TEST_DEPS}
 	${CC} ${INCLUDE_DIRS} ${CCFLAGS} ${TEST_CCFLAGS} -o $@ -c $<
