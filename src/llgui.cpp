@@ -24,7 +24,7 @@
 //   Constants   //
 /////////////////*/
 /// @summary Define the number of glyph indices we'd like to store per-bucket.
-/// Glyph indices are stored as 32-bit unsigned integers. The actual size of 
+/// Glyph indices are stored as 32-bit unsigned integers. The actual size of
 /// the bucket is two more than this, and stores the number of entries used.
 static size_t const FONT_BUCKET_SIZE      = 14;
 
@@ -49,8 +49,8 @@ static size_t const FONT_CODEPOINT_OFFSET = 2;
 /// @return A power-of-two that is greater than or equal to value.
 static inline size_t pow2_ge(size_t value, size_t min)
 {
-    assert(min > 0);
-    assert(min & (min - 1) == 0); 
+    assert((min > 0));
+    assert((min & (min - 1)) == 0);
     size_t x = min;
     while (x < value)
         x  <<= 1;
@@ -108,7 +108,7 @@ static inline char const* next_codepoint(char const *str, uint32_t &cp)
     return str + 1;
 }
 
-/// @summary Determine the amount to advance the cursor by on the horizontal axis, 
+/// @summary Determine the amount to advance the cursor by on the horizontal axis,
 /// taking into account the kerning table of the font.
 /// @param f The font to query.
 /// @param a The codepoint of the first glyph.
