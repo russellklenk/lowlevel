@@ -322,3 +322,72 @@ void gui::measure_string(gui::bitmap_font_t const *font, char const *str, size_t
     }
 }
 
+void gui::init_key_buffer(gui::key_buffer_t *buffer)
+{
+    if (buffer)
+    {
+        buffer->Count = 0;
+    }
+}
+
+void gui::key_buffer_flush(gui::key_buffer_t *buffer)
+{
+    buffer->Count = 0;
+}
+
+void gui::key_buffer_press(gui::key_buffer_t *buffer, gui::key_state_t const *key)
+{
+    if (buffer->Count < LLGUI_MAX_ACTIVE_KEYS)
+    {
+        size_t      n = buffer->Count;
+        uint16_t   *k = buffer->KeyCode;
+        uint16_t    v = key->KeyCode;
+        for (size_t i = 0; i < n; ++i)
+        {
+            if (k[i] == v)
+            {   // this key is already active, update state.
+                buffer->DownTime[i] = key->DownTime;
+                buffer->Delay[i]    = key->Delay;
+                return;
+            }
+        }
+        buffer->KeyCode[n]  = v;
+        buffer->DownTime[n] = key->DownTime;
+        buffer->Delay[n]    = key->Delay;
+        buffer->Count++;
+    }
+    // else, the key press is dropped.
+}
+
+void gui::key_buffer_release(gui::key_buffer_t *buffer, uint16_t key_code)
+{
+    size_t      n = buffer->Count;
+    uint16_t   *k = buffer->KeyCode;
+    for (size_t i = 0; i < n; ++i)
+    {
+        if (k[i] == key_code)
+        {   // swap the last active key into this slot.
+            buffer->KeyCode[i]  = buffer->KeyCode [n-1];
+            buffer->DownTime[i] = buffer->DownTime[n-1];
+            buffer->Delay[i]    = buffer->Delay   [n-1];
+            buffer->Count--;
+            return;
+        }
+    }
+}
+
+bool gui::key_index(gui::key_buffer_t *buffer, uint16_t key_code, size_t *out_index)
+{
+    size_t      n = buffer->Count;
+    uint16_t   *k = buffer->KeyCode;
+    for (size_t i = 0; i < n; ++i)
+    {
+        if (k[i] == key_code)
+        {
+            if (out_index) *out_index = i;
+            return true;
+        }
+    }
+    return false;
+}
+

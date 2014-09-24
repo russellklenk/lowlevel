@@ -57,6 +57,10 @@ namespace gui {
 /*/////////////////
 //   Constants   //
 /////////////////*/
+/// @summary Define the maximum number of active keys at any given time.
+#ifndef LLGUI_MAX_ACTIVE_KEYS
+#define LLGUI_MAX_ACTIVE_KEYS    8U
+#endif
 
 /*/////////////////
 //   Data Types  //
@@ -116,6 +120,25 @@ struct bitmap_font_info_t
     size_t          Baseline;   /// The number of pixels from the top of a line to the common base.
 };
 
+/// @summary Encapsulates the current state of a single key in the input buffer.
+struct key_state_t
+{
+    uint16_t        KeyCode;    /// The raw key code.
+    float           DownTime;   /// The time value at which the key was pressed.
+    float           Delay;      /// The amount of time remaining before a key repeat.
+};
+
+/// @summary Stores the state associated with currently pressed keys. This is 
+/// used internally by the IMGUI context, and typically not by the application.
+/// The IMGUI context accesses the fields of this type directly.
+struct key_buffer_t
+{
+    size_t          Count;                           /// The number of active keys.
+    uint16_t        KeyCode [LLGUI_MAX_ACTIVE_KEYS]; /// The raw key codes.
+    float           DownTime[LLGUI_MAX_ACTIVE_KEYS]; /// The key press timestamp.
+    float           Delay   [LLGUI_MAX_ACTIVE_KEYS]; /// Time remaining before key repeat.
+};
+
 /*////////////////
 //   Functions  //
 ////////////////*/
@@ -172,6 +195,31 @@ LLGUI_PUBLIC void* glyph_page(gui::bitmap_font_t const *font, size_t i);
 /// @param out_w On return, this location stores the width of the string, in pixels.
 /// @param out_h On return, this location stores the height of the string, in pixels.
 LLGUI_PUBLIC void measure_string(gui::bitmap_font_t const *font, char const *str, size_t *out_w, size_t *out_h);
+
+/// @summary Initializes a key buffer to empty (no keys active).
+/// @param buffer The buffer to initialize.
+LLGUI_PUBLIC void init_key_buffer(gui::key_buffer_t *buffer);
+
+/// @summary Resets a key buffer to empty (no keys active).
+/// @param buffer The buffer to flush.
+LLGUI_PUBLIC void key_buffer_flush(gui::key_buffer_t *buffer);
+
+/// @summary Buffers a key press event, marking a key as active.
+/// @param buffer The active key buffer.
+/// @param key Information about the key that was pressed.
+LLGUI_PUBLIC void key_buffer_press(gui::key_buffer_t *buffer, gui::key_state_t const *key);
+
+/// @summary Indicates that a key was released, removing it from the active buffer.
+/// @param buffer The active key buffer.
+/// @param key_code The key code of the key that was released.
+LLGUI_PUBLIC void key_buffer_release(gui::key_buffer_t *buffer, uint16_t key_code);
+
+/// @summary Locates a key within the active buffer.
+/// @param buffer The buffer to query.
+/// @param key_code The key code of the key being queried.
+/// @param out_index On return, stores the zero-based index of the key.
+/// @return true if the key was found in the active buffer.
+LLGUI_PUBLIC bool key_index(gui::key_buffer_t *buffer, uint16_t key_code, size_t *out_index);
 
 /*/////////////////////
 //   Namespace End   //
