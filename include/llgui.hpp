@@ -59,73 +59,85 @@ namespace gui {
 /////////////////*/
 /// @summary Define the maximum number of active keys at any given time.
 #ifndef LLGUI_MAX_ACTIVE_KEYS
-#define LLGUI_MAX_ACTIVE_KEYS    8U
+#define LLGUI_MAX_ACTIVE_KEYS      8U
 #endif
 
 /*/////////////////
 //   Data Types  //
 /////////////////*/
+/// @summary Bitflags defining the state of a mouse button.
+enum mouse_state_e
+{
+    MOUSE_OFF          = 0x00,     /// Currently released
+    MOUSE_ON           = 0x01,     /// Currently pressed
+    MOUSE_BEGIN        = 0x02,     /// Just pressed
+    MOUSE_END          = 0x04,     /// Just released
+    MOUSE_SHIFT        = 0x08,     /// Shift key is active
+    MOUSE_ALT          = 0x10,     /// ALT key is active
+    MOUSE_CTRL         = 0x20      /// Ctrl key is active
+};
+
 /// @summary Defines the data associated with a single glyph in a bitmap font.
 struct bitmap_glyph_t
 {
-    uint32_t        Codepoint;  /// The Unicode codepoint associated with the glyph.
-    uint16_t        TextureX;   /// X-coordinate of the upper-left corner of the glyph.
-    uint16_t        TextureY;   /// Y-coordinate of the upper-left corner of the glyph.
-    uint16_t        Width;      /// Width of the glyph on the texture, in pixels.
-    uint16_t        Height;     /// Height of the glyph on the texture, in pixels.
-    uint16_t        OffsetX;    /// Horizontal offset when copying the glyph to the screen.
-    uint16_t        OffsetY;    /// Vertical offset when copying the glyph to the screen.
-    uint16_t        AdvanceX;   /// How much to advance the current position.
-    uint8_t         PageIndex;  /// The index of the page containing the glyph data.
+    uint32_t           Codepoint;  /// The Unicode codepoint associated with the glyph.
+    uint16_t           TextureX;   /// X-coordinate of the upper-left corner of the glyph.
+    uint16_t           TextureY;   /// Y-coordinate of the upper-left corner of the glyph.
+    uint16_t           Width;      /// Width of the glyph on the texture, in pixels.
+    uint16_t           Height;     /// Height of the glyph on the texture, in pixels.
+    uint16_t           OffsetX;    /// Horizontal offset when copying the glyph to the screen.
+    uint16_t           OffsetY;    /// Vertical offset when copying the glyph to the screen.
+    uint16_t           AdvanceX;   /// How much to advance the current position.
+    uint8_t            PageIndex;  /// The index of the page containing the glyph data.
 };
 
 /// @summary Defines the data associated with a bitmap font.
 struct bitmap_font_t
 {
-    size_t          GlyphCount; /// The number of glyphs defined in the font.
-    size_t          BucketCount;/// The number of buckets in the glyph table.
-    uint32_t      **GTable;     /// Table mapping Unicode codepoint -> index in Glyphs.
-    bitmap_glyph_t *Glyphs;     /// List of glyph definitions.
-    size_t          KernCount;  /// The number of entries in the kerning table.
-    uint32_t       *KerningA;   /// Codepoints of the first glyph in a kerning pair.
-    uint32_t       *KerningB;   /// Codepoints of the second glyph in a kerning pair.
-    int32_t        *KerningX;   /// Horizontal advance for a kerning pair.
-    size_t          BitDepth;   /// Number of bits-per-pixel in a page image, either 8 or 32.
-    size_t          PageWidth;  /// Width of a single page image, in pixels.
-    size_t          PageHeight; /// Height of a single page image, in pixels.
-    size_t          PageBytes;  /// The number of bytes in a single page image.
-    size_t          PageCount;  /// The number of pages defined in the font.
-    void           *PageData;   /// The raw page data in either R8 or ABGR format.
-    char           *FontName;   /// The name of the font.
-    size_t          PointSize;  /// The font size, in points.
-    size_t          LineHeight; /// The number of vertical pixels between two lines.
-    size_t          Baseline;   /// The number of pixels from the top of a line to the common base.
-    size_t          MinWidth;   /// The smallest width of any glyph in the font.
-    size_t          MaxWidth;   /// The largest width of any glyph in the font.
-    float           AvgWidth;   /// The average width of a glyph in the font.
+    size_t             GlyphCount; /// The number of glyphs defined in the font.
+    size_t             BucketCount;/// The number of buckets in the glyph table.
+    uint32_t         **GTable;     /// Table mapping Unicode codepoint -> index in Glyphs.
+    bitmap_glyph_t    *Glyphs;     /// List of glyph definitions.
+    size_t             KernCount;  /// The number of entries in the kerning table.
+    uint32_t          *KerningA;   /// Codepoints of the first glyph in a kerning pair.
+    uint32_t          *KerningB;   /// Codepoints of the second glyph in a kerning pair.
+    int32_t           *KerningX;   /// Horizontal advance for a kerning pair.
+    size_t             BitDepth;   /// Number of bits-per-pixel in a page image, either 8 or 32.
+    size_t             PageWidth;  /// Width of a single page image, in pixels.
+    size_t             PageHeight; /// Height of a single page image, in pixels.
+    size_t             PageBytes;  /// The number of bytes in a single page image.
+    size_t             PageCount;  /// The number of pages defined in the font.
+    void              *PageData;   /// The raw page data in either R8 or ABGR format.
+    char              *FontName;   /// The name of the font.
+    size_t             PointSize;  /// The font size, in points.
+    size_t             LineHeight; /// The number of vertical pixels between two lines.
+    size_t             Baseline;   /// The number of pixels from the top of a line to the common base.
+    size_t             MinWidth;   /// The smallest width of any glyph in the font.
+    size_t             MaxWidth;   /// The largest width of any glyph in the font.
+    float              AvgWidth;   /// The average width of a glyph in the font.
 };
 
 /// @summary Defines the data necessary to allocate storage for a bitmap font.
 struct bitmap_font_info_t
 {
-    size_t          GlyphCount; /// The number of glyphs defined in the font.
-    size_t          KernCount;  /// The number of kerning table entries.
-    size_t          BitDepth;   /// The bits-per-pixel of the image data, either 8 or 32.
-    size_t          PageWidth;  /// The width of a single texture page, in pixels.
-    size_t          PageHeight; /// The height of a single texture page, in pixels.
-    size_t          PageCount;  /// The number of texture pages containing glyphs.
-    char const     *FontName;   /// An optional font name, may be NULL.
-    size_t          PointSize;  /// The font size, in points.
-    size_t          LineHeight; /// The number of vertical pixels between two lines.
-    size_t          Baseline;   /// The number of pixels from the top of a line to the common base.
+    size_t             GlyphCount; /// The number of glyphs defined in the font.
+    size_t             KernCount;  /// The number of kerning table entries.
+    size_t             BitDepth;   /// The bits-per-pixel of the image data, either 8 or 32.
+    size_t             PageWidth;  /// The width of a single texture page, in pixels.
+    size_t             PageHeight; /// The height of a single texture page, in pixels.
+    size_t             PageCount;  /// The number of texture pages containing glyphs.
+    char const        *FontName;   /// An optional font name, may be NULL.
+    size_t             PointSize;  /// The font size, in points.
+    size_t             LineHeight; /// The number of vertical pixels between two lines.
+    size_t             Baseline;   /// The number of pixels from the top of a line to the common base.
 };
 
 /// @summary Encapsulates the current state of a single key in the input buffer.
 struct key_state_t
 {
-    uint16_t        KeyCode;    /// The raw key code.
-    float           DownTime;   /// The time value at which the key was pressed.
-    float           Delay;      /// The amount of time remaining before a key repeat.
+    uint16_t           KeyCode;    /// The raw key code.
+    float              DownTime;   /// The time value at which the key was pressed.
+    float              Delay;      /// The amount of time remaining before a key repeat.
 };
 
 /// @summary Stores the state associated with currently pressed keys. This is 
@@ -133,10 +145,62 @@ struct key_state_t
 /// The IMGUI context accesses the fields of this type directly.
 struct key_buffer_t
 {
-    size_t          Count;                           /// The number of active keys.
-    uint16_t        KeyCode [LLGUI_MAX_ACTIVE_KEYS]; /// The raw key codes.
-    float           DownTime[LLGUI_MAX_ACTIVE_KEYS]; /// The key press timestamp.
-    float           Delay   [LLGUI_MAX_ACTIVE_KEYS]; /// Time remaining before key repeat.
+    size_t             Count;                           /// The number of active keys.
+    uint16_t           KeyCode [LLGUI_MAX_ACTIVE_KEYS]; /// The raw key codes.
+    float              DownTime[LLGUI_MAX_ACTIVE_KEYS]; /// The key press timestamp.
+    float              Delay   [LLGUI_MAX_ACTIVE_KEYS]; /// Time remaining before key repeat.
+};
+
+/// @summary Defines the state associated with a control that behaves like a 
+/// standard clickable button. This structure is returned to the application.
+struct button_t
+{
+    size_t             X;           /// The x-coordinate of the upper-left corner of the control.
+    size_t             Y;           /// The y-coordinate of the upper-left corner of the control.
+    size_t             Width;       /// The width of the control, in pixels.
+    size_t             Height;      /// The height of the control, in pixels.
+    uint32_t           State;       /// An application-defined value associated with the button.
+    bool               IsHot;       /// true if the control is mouse is hovering over the control.
+    bool               IsActive;    /// true if the control is being interacted with.
+    bool               WasClicked;  /// true if the button was clicked.
+};
+
+/// @summary A helper structure representing a list of controls of type T, where
+/// T = gui::button_t, etc. Controls can be accessed directly, or by ID.
+template <typename T>
+struct control_list_t
+{
+    size_t             Capacity;    /// The capacity of the control list.
+    size_t             Count;       /// The number of items in the Ids and State lists.
+    uint32_t          *Ids;         /// The list of control IDs.
+    T                 *State;       /// The list of control state.
+};
+typedef gui::control_list_t<gui::button_t> button_list_t;
+/// more
+/// ...
+
+/// @summary Defines the state associated with a single set of IMGUI controls.
+/// Each logical UI should maintain its own context.
+struct context_t
+{
+    void              *HotItem;     /// Pointer to the current hot (hover) item, or NULL.
+    void              *ActiveItem;  /// Pointer to the current active (interaction) item, or NULL.
+    size_t             MouseX;      /// The client-relative mouse position.
+    size_t             MouseY;      /// The client-relative mouse position.
+    size_t             MouseDownX;  /// The client-relative mouse position when the button was pressed or released.
+    size_t             MouseDownY;  /// The client-relative mouse position when the button was pressed or released.
+    uint32_t           MouseState;  /// A combination of mouse_state_e.
+    size_t             KeyCount;    /// The number of active keys on this update.
+    uint16_t           ActiveKeys[LLGUI_MAX_ACTIVE_KEYS]; /// Keys active this update.
+    gui::key_buffer_t  KeyHistory;  /// History values for implementing key repeat.
+    bool               CapsLockOn;  /// true if caps lock is currently active.
+    bool               ShiftDown;   /// true if the shift key is currently active.
+    float              UpdateTime;  /// The time of the current update, in seconds.
+    float              DeltaTime;   /// The time elapsed since the previous update, in seconds.
+    float              RepeatRate;  /// The key repeat rate, in characters per-second.
+    float              BlinkRate;   /// The caret blink rate, in cycles per-second.
+    float              CaretAlpha;  /// The opacity value of the caret.
+    gui::button_list_t Buttons;     /// List of cached button state.
 };
 
 /*////////////////
@@ -220,6 +284,30 @@ LLGUI_PUBLIC void key_buffer_release(gui::key_buffer_t *buffer, uint16_t key_cod
 /// @param out_index On return, stores the zero-based index of the key.
 /// @return true if the key was found in the active buffer.
 LLGUI_PUBLIC bool key_index(gui::key_buffer_t *buffer, uint16_t key_code, size_t *out_index);
+
+/// @summary Creates and initializes a UI context.
+/// @param ui The UI context to initialize.
+/// @return true if the context was successfully initialized.
+LLGUI_PUBLIC bool create_context(gui::context_t *ui);
+
+/// @summary Releases resources associated with a UI context.
+/// @param ui The UI context to delete.
+LLGUI_PUBLIC void delete_context(gui::context_t *ui);
+
+/// @summary Resets the cached control state within the UI context, so it is as
+/// if the context has no controls defined. The state of input devices is also reset.
+/// @param ui The UI context to reset.
+LLGUI_PUBLIC void flush_context(gui::context_t *ui);
+
+/// @summary Performs a simple point-in-rectangle hit test.
+/// @param x The x-coordinate of the upper-left corner of the rectangle.
+/// @param y The y-coordinate of the upper-left corner of the rectangle.
+/// @param w The width of the rectangle.
+/// @param h The height of the rectangle.
+/// @param test_x The x-coordinate of the point being tested.
+/// @param test_y The y-coordinate of the point being tested.
+/// @return true if the rectangle contains the test point.
+LLGUI_PUBLIC bool hit_test(size_t x, size_t y, size_t w, size_t h, size_t test_x, size_t test_y);
 
 /*/////////////////////
 //   Namespace End   //

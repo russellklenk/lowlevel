@@ -136,6 +136,99 @@ static int32_t advance_x(gui::bitmap_font_t const *f, uint32_t a, uint32_t b, in
     return default_x;
 }
 
+/// @summary Initializes a control list.
+/// @param list The list to initialize.
+/// @param capacity The initial list capacity.
+template <typename T>
+static inline void clist_init(gui::control_list_t<T> *list, size_t capacity)
+{
+    list->Capacity  = capacity;
+    list->Count     = 0;
+    list->Ids       = NULL;
+    list->State     = NULL;
+    if (capacity)
+    {
+        list->Ids   = (uint32_t*) malloc(capacity * sizeof(uint32_t));
+        list->State = (T       *) malloc(capacity * sizeof(T));
+    }
+}
+
+/// @summary Releases resources associated with a control list.
+/// @param list The control list to delete.
+template <typename T>
+static inline void clist_free(gui::control_list_t<T> *list)
+{
+    if (list->State != NULL) free(list->State);
+    if (list->Ids   != NULL) free(list->Ids);
+    list->Capacity   = 0;
+    list->Count      = 0;
+    list->Ids        = NULL;
+    list->State      = NULL;
+}
+
+/// @summary Flushes a control list, returning it to empty.
+/// @param list The list to flush.
+template <typename T>
+static inline void clist_flush(gui::control_list_t<T> *list)
+{
+    list->Count = 0;
+}
+
+/// @summary Searches a control list for a given control ID.
+/// @param list The list to search.
+/// @param id The unique identifier of the control.
+/// @param out_index On return, stores the zero-based index of the control state.
+/// @return true if the control was found.
+template <typename T>
+static inline bool clist_find(gui::control_list_t<T> *list, uint32_t id, size_t *out_index)
+{
+    for (size_t i = 0; i < list->Count; ++i)
+    {
+        if (list->Ids[i] == id)
+        {
+            *out_index = i;
+            return true;
+        }
+    }
+    return false;
+}
+
+/// @summary Appends a control to the end of the list.
+/// @param list The list to update.
+/// @param id The unique identifier of the control being added.
+/// @param state The state of the control being added.
+template <typename T>
+static inline void clist_append(gui::control_list_t<T> *list, uint32_t id, T const &state)
+{
+    if (list->Count == list->Capacity)
+    {
+        size_t    new_max   = list->Capacity < 64 ? list->Capacity * 2 : list->Capacity + 64;
+        uint32_t *new_ids   = (uint32_t*) realloc(list->Ids  , new_max * sizeof(uint32_t));
+        T        *new_state = (T       *) realloc(list->State, new_max * sizeof(T));
+        if (new_ids   != NULL) list->Ids    = new_ids;
+        if (new_state != NULL) list->State  = new_state;
+        if (new_ids   != NULL && new_state != NULL) list->Capacity = new_max;
+    }
+    list->Ids[list->Count]   = id;
+    list->State[list->Count] = state;
+    list->Count++;
+}
+
+/// @summary Updates an existing control, or appends it if it doesn't exist.
+/// @param list The list to update.
+/// @param id The unique identifier of the control.
+/// @param state The current state of the control.
+template <typename T>
+static inline void clist_update(gui::control_list_t<T> *list, uint32_t id, T const &state)
+{
+    size_t index = 0;
+    if (clist_find(list, id, &index))
+    {
+        list->State[index] = state;
+    }
+    else clist_append(list, id, state);
+}
+
 /*////////////////////////
 //   Public Functions   //
 ////////////////////////*/
@@ -389,5 +482,62 @@ bool gui::key_index(gui::key_buffer_t *buffer, uint16_t key_code, size_t *out_in
         }
     }
     return false;
+}
+
+bool gui::create_context(gui::context_t *ui)
+{
+    if (ui)
+    {
+        ui->HotItem         = NULL;
+        ui->ActiveItem      = NULL;
+        ui->MouseX          = 0;
+        ui->MouseY          = 0;
+        ui->MouseDownX      = 0;
+        ui->MouseDownY      = 0;
+        ui->MouseState      = gui::MOUSE_OFF;
+        ui->KeyCount        = 0;
+        ui->CapsLockOn      = false;
+        ui->ShiftDown       = false;
+        ui->UpdateTime      = 0.0f;
+        ui->DeltaTime       = 0.0f;
+        ui->RepeatRate      = 10.0f; // 10 characters per-second
+        ui->BlinkRate       = 2.0f;  // blink 2 times per-second
+        ui->CaretAlpha      = 1.0f;  // fully opaque
+        gui::init_key_buffer(&ui->KeyHistory);
+        clist_init(&ui->Buttons, 32);
+        // more clist_init()
+        // ...
+        return true;
+    }
+    else return false;
+}
+
+void gui::delete_context(gui::context_t *ui)
+{
+    if (ui)
+    {
+        ui->HotItem    = NULL;
+        ui->ActiveItem = NULL;
+        clist_free(&ui->Buttons);
+        // more clist_free()
+        // ...
+    }
+}
+
+void gui::flush_context(gui::context_t *ui)
+{
+    ui->HotItem    = NULL;
+    ui->ActiveItem = NULL;
+    ui->MouseState = gui::MOUSE_OFF;
+    ui->KeyCount   = 0;
+    clist_flush(&ui->Buttons);
+    // more clist_flush()
+    // ...
+}
+
+bool gui::hit_test(size_t x, size_t y, size_t w, size_t h, size_t test_x, size_t test_y)
+{
+    return (test_x >= x && test_x < (x + w) && 
+            test_y >= y && test_y < (y + h));
 }
 
