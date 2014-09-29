@@ -488,13 +488,13 @@ bool gui::create_context(gui::context_t *ui)
 {
     if (ui)
     {
-        ui->HotItem         = NULL;
-        ui->ActiveItem      = NULL;
-        ui->MouseX          = 0;
-        ui->MouseY          = 0;
-        ui->MouseDownX      = 0;
-        ui->MouseDownY      = 0;
-        ui->MouseState      = gui::MOUSE_OFF;
+        ui->HotItem         = LLGUI_INVALID_ID;
+        ui->ActiveItem      = LLGUI_INVALID_ID;
+        ui->PointerX        = 0.0f;
+        ui->PointerY        = 0.0f;
+        ui->InteractX       = 0.0f;
+        ui->InteractY       = 0.0f;
+        ui->Interaction     = gui::INTERACTION_OFF;
         ui->KeyCount        = 0;
         ui->CapsLockOn      = false;
         ui->ShiftDown       = false;
@@ -516,8 +516,8 @@ void gui::delete_context(gui::context_t *ui)
 {
     if (ui)
     {
-        ui->HotItem    = NULL;
-        ui->ActiveItem = NULL;
+        ui->HotItem    = LLGUI_INVALID_ID;
+        ui->ActiveItem = LLGUI_INVALID_ID;
         clist_free(&ui->Buttons);
         // more clist_free()
         // ...
@@ -526,10 +526,10 @@ void gui::delete_context(gui::context_t *ui)
 
 void gui::flush_context(gui::context_t *ui)
 {
-    ui->HotItem    = NULL;
-    ui->ActiveItem = NULL;
-    ui->MouseState = gui::MOUSE_OFF;
-    ui->KeyCount   = 0;
+    ui->HotItem     = LLGUI_INVALID_ID;
+    ui->ActiveItem  = LLGUI_INVALID_ID;
+    ui->Interaction = gui::INTERACTION_OFF;
+    ui->KeyCount    = 0;
     clist_flush(&ui->Buttons);
     // more clist_flush()
     // ...
@@ -539,5 +539,180 @@ bool gui::hit_test(size_t x, size_t y, size_t w, size_t h, size_t test_x, size_t
 {
     return (test_x >= x && test_x < (x + w) && 
             test_y >= y && test_y < (y + h));
+}
+
+bool gui::pointer_over(gui::context_t *ui, size_t x, size_t y, size_t w, size_t h)
+{
+    return (ui->PointerX >= x && ui->PointerX < (x + w) &&
+            ui->PointerY >= y && ui->PointerY < (y + h));
+}
+
+void gui::pointer_move(gui::context_t *ui, float x, float y)
+{
+    ui->PointerX = x;
+    ui->PointerY = y;
+}
+
+void gui::interaction_begin(gui::context_t *ui, float x, float y, uint32_t modifiers)
+{
+    ui->PointerX    = x;
+    ui->PointerY    = y;
+    ui->InteractX   = x;
+    ui->InteractY   = y;
+    modifiers      &= gui::INTERACTION_ALT | gui::INTERACTION_CTRL  | gui::INTERACTION_SHIFT;
+    ui->Interaction = gui::INTERACTION_ON  | gui::INTERACTION_BEGIN | modifiers;
+}
+
+void gui::interaction_end(gui::context_t *ui, float x, float y, uint32_t modifiers)
+{
+    ui->PointerX    = x;
+    ui->PointerY    = y;
+    modifiers      &= gui::INTERACTION_ALT | gui::INTERACTION_CTRL | gui::INTERACTION_SHIFT;
+    ui->Interaction = gui::INTERACTION_ON  | gui::INTERACTION_END  | modifiers;
+}
+
+void gui::key_press(gui::context_t *ui, float x, float y, uint16_t key_code, uint32_t modifiers)
+{
+    gui::key_state_t ks;
+    ks.KeyCode     = key_code;
+    ks.DownTime    = ui->UpdateTime;
+    ks.Delay       = 1.0f; // @todo: have ui->RepeatDelay
+    gui::key_buffer_press(&ui->KeyHistory, &ks);
+    ui->PointerX   = x;
+    ui->PointerY   = y;
+    if ((modifiers & gui::INTERACTION_CAPS) != 0)
+    {
+        ui->CapsLockOn = ! ui->CapsLockOn;
+    }
+    if ((modifiers & gui::INTERACTION_SHIFT) != 0)
+    {
+        ui->ShiftDown = true;
+    }
+}
+
+void gui::key_repeat(gui::context_t *ui, float x, float y, uint16_t key_code)
+{
+    size_t index = 0;
+    if (gui::key_index(&ui->KeyHistory, key_code, &index))
+    {
+        gui::key_buffer_t &kb = ui->KeyHistory;
+        float          repeat = 1.0f / ui->RepeatRate;
+
+        if (kb.Delay[index]  - ui->DeltaTime > 0.0f)
+        {
+            // still waiting for the initial delay period to expire.
+            kb.Delay[index] -= ui->DeltaTime;
+        }
+        else
+        {
+            // the key is known to be pressed. has enough time passed 
+            // that we need to regenerate the key press event?
+            if (ui->UpdateTime - kb.DownTime[index] > repeat)
+            {
+                // generate a key repeat by updating the timestamp.
+                kb.DownTime[index] = ui->UpdateTime;
+            }
+        }
+    }
+    ui->PointerX = x;
+    ui->PointerY = y;
+}
+
+void gui::key_release(gui::context_t *ui, float x, float y, uint16_t key_code, uint32_t modifiers)
+{
+    gui::key_buffer_release(&ui->KeyHistory, key_code);
+    if ((modifiers & gui::INTERACTION_SHIFT) == 0)
+    {
+        ui->ShiftDown = false;
+    }
+}
+
+bool gui::make_hot(gui::context_t *ui, uint32_t id)
+{
+    if (ui->ActiveItem == LLGUI_INVALID_ID || ui->ActiveItem == id)
+    {
+        ui->HotItem = id;
+        return true;
+    }
+    else return false; // a different item is currently active.
+}
+
+void gui::make_active(gui::context_t *ui, uint32_t id)
+{
+    ui->ActiveItem = id;
+}
+
+void gui::make_not_hot(gui::context_t *ui, uint32_t id)
+{
+    if (ui->HotItem == id)
+    {
+        ui->HotItem  = LLGUI_INVALID_ID;
+    }
+}
+
+void gui::make_not_active(gui::context_t *ui, uint32_t id)
+{
+    if (ui->ActiveItem == id)
+    {
+        ui->ActiveItem  = LLGUI_INVALID_ID;
+    }
+}
+
+bool gui::interaction_starting(gui::context_t *ui)
+{
+    return ((ui->Interaction & gui::INTERACTION_ON) != 0 && (ui->Interaction & gui::INTERACTION_BEGIN) != 0);
+}
+
+bool gui::interaction_active(gui::context_t *ui)
+{
+    return ((ui->Interaction & gui::INTERACTION_ON) != 0);
+}
+
+bool gui::interaction_ending(gui::context_t *ui)
+{
+    return ((ui->Interaction & gui::INTERACTION_ON) != 0 && (ui->Interaction & gui::INTERACTION_END) != 0);
+}
+
+void gui::begin_update(gui::context_t *ui, float current_time, float elapsed_time)
+{
+    ui->UpdateTime  = current_time;
+    ui->DeltaTime   = elapsed_time;
+
+    float seconds_per_blink = 1.0f / ui->BlinkRate;
+    float multiples = current_time * ui->BlinkRate;
+    float whole     = floorf(multiples);
+    float frac      = multiples - whole;
+
+    if (int(whole) & 1) ui->CaretAlpha = 1.0f - frac;
+    else ui->CaretAlpha = frac;
+}
+
+void gui::end_input(gui::context_t *ui)
+{
+    gui::key_buffer_t const &kb = ui->KeyHistory;
+    size_t                   nk = 0;
+
+    ui->KeyCount  = 0;
+    for (size_t i = 0; i < kb.Count; ++i)
+    {
+        if (kb.DownTime[i] == ui->UpdateTime && nk < LLGUI_MAX_ACTIVE_KEYS)
+        {
+            ui->ActiveKeys[nk++] = kb.KeyCode[i];
+        }
+    }
+    ui->KeyCount  = nk;
+}
+
+void gui::end_update(gui::context_t *ui)
+{
+    if ((ui->Interaction & gui::INTERACTION_BEGIN) != 0)
+    {
+        ui->Interaction ^= gui::INTERACTION_BEGIN;
+    }
+    if ((ui->Interaction  & gui::INTERACTION_END) != 0)
+    {
+        ui->Interaction  = gui::INTERACTION_OFF;
+    }
+    ui->KeyCount = 0;
 }
 

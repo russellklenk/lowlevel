@@ -62,19 +62,25 @@ namespace gui {
 #define LLGUI_MAX_ACTIVE_KEYS      8U
 #endif
 
+/// @summary Reserve a specific identifier to represent an invalid control ID.
+#ifndef LLGUI_INVALID_ID
+#define LLGUI_INVALID_ID           0xFFFFFFFFU
+#endif
+
 /*/////////////////
 //   Data Types  //
 /////////////////*/
-/// @summary Bitflags defining the state of a mouse button.
-enum mouse_state_e
+/// @summary Bitflags defining the state of the user interaction.
+enum interaction_e
 {
-    MOUSE_OFF          = 0x00,     /// Currently released
-    MOUSE_ON           = 0x01,     /// Currently pressed
-    MOUSE_BEGIN        = 0x02,     /// Just pressed
-    MOUSE_END          = 0x04,     /// Just released
-    MOUSE_SHIFT        = 0x08,     /// Shift key is active
-    MOUSE_ALT          = 0x10,     /// ALT key is active
-    MOUSE_CTRL         = 0x20      /// Ctrl key is active
+    INTERACTION_OFF    = 0x00,     /// Currently released
+    INTERACTION_ON     = 0x01,     /// Currently pressed
+    INTERACTION_BEGIN  = 0x02,     /// Just pressed
+    INTERACTION_END    = 0x04,     /// Just released
+    INTERACTION_SHIFT  = 0x08,     /// Shift key is active
+    INTERACTION_ALT    = 0x10,     /// ALT key is active
+    INTERACTION_CTRL   = 0x20,     /// Ctrl key is active
+    INTERACTION_CAPS   = 0x40      /// Caps Lock is toggled
 };
 
 /// @summary Defines the data associated with a single glyph in a bitmap font.
@@ -183,13 +189,13 @@ typedef gui::control_list_t<gui::button_t> button_list_t;
 /// Each logical UI should maintain its own context.
 struct context_t
 {
-    void              *HotItem;     /// Pointer to the current hot (hover) item, or NULL.
-    void              *ActiveItem;  /// Pointer to the current active (interaction) item, or NULL.
-    size_t             MouseX;      /// The client-relative mouse position.
-    size_t             MouseY;      /// The client-relative mouse position.
-    size_t             MouseDownX;  /// The client-relative mouse position when the button was pressed or released.
-    size_t             MouseDownY;  /// The client-relative mouse position when the button was pressed or released.
-    uint32_t           MouseState;  /// A combination of mouse_state_e.
+    uint32_t           HotItem;     /// The current hot (hover) item ID.
+    uint32_t           ActiveItem;  /// The current active (interaction) item ID.
+    float              PointerX;    /// The client-relative interaction pointer position.
+    float              PointerY;    /// The client-relative interaction pointer position.
+    float              InteractX;   /// The client-relative mouse position when the button was pressed or released.
+    float              InteractY;   /// The client-relative mouse position when the button was pressed or released.
+    uint32_t           Interaction; /// A combination of interaction_modifier_e.
     size_t             KeyCount;    /// The number of active keys on this update.
     uint16_t           ActiveKeys[LLGUI_MAX_ACTIVE_KEYS]; /// Keys active this update.
     gui::key_buffer_t  KeyHistory;  /// History values for implementing key repeat.
@@ -308,6 +314,110 @@ LLGUI_PUBLIC void flush_context(gui::context_t *ui);
 /// @param test_y The y-coordinate of the point being tested.
 /// @return true if the rectangle contains the test point.
 LLGUI_PUBLIC bool hit_test(size_t x, size_t y, size_t w, size_t h, size_t test_x, size_t test_y);
+
+/// @summary Performs a point-in-rectangle hit test using the current pointer position.
+/// @param ui The GUI context.
+/// @param x The x-coordinate of the upper-left corner of the rectangle.
+/// @param y The y-coordinate of the upper-left corner of the rectangle.
+/// @param w The width of the rectangle.
+/// @param h The height of the rectangle.
+/// @return true if the rectangle contains the interaction pointer.
+LLGUI_PUBLIC bool pointer_over(gui::context_t *ui, size_t x, size_t y, size_t w, size_t h);
+
+/// @summary Sets the current interaction pointer position.
+/// @param ui The GUI context to modify.
+/// @param x The x-coordinate of the pointer, in pixels.
+/// @param y The y-coordinate of the pointer, in pixels.
+LLGUI_PUBLIC void pointer_move(gui::context_t *ui, float x, float y);
+
+/// @summary Indicates that the primary interaction button has been pressed.
+/// @param ui The GUI context to update.
+/// @param x The x-coordinate of the pointer, in pixels.
+/// @param y The y-coordinate of the pointer, in pixels.
+/// @param modifiers A combination of interaction_e indicating which modifiers are active.
+LLGUI_PUBLIC void interaction_begin(gui::context_t *ui, float x, float y, uint32_t modifiers);
+
+/// @summary Indicates that the primary interaction button has been released.
+/// @param ui The GUI context to update.
+/// @param x The x-coordinate of the pointer, in pixels.
+/// @param y The y-coordinate of the pointer, in pixels.
+/// @param modifiers A combination of interaction_e indicating which modifiers are active.
+LLGUI_PUBLIC void interaction_end(gui::context_t *ui, float x, float y, uint32_t modifiers);
+
+/// @summary Indicates that a key was pressed.
+/// @param ui The GUI context to update.
+/// @param x The x-coordinate of the pointer, in pixels.
+/// @param y The y-coordinate of the pointer, in pixels.
+/// @param key_code The key code of the key that was pressed.
+/// @param modifiers A combination of interaction_e indicating which modifiers are active.
+LLGUI_PUBLIC void key_press(gui::context_t *ui, float x, float y, uint16_t key_code, uint32_t modifiers);
+
+/// @summary Indicates a key repeat action.
+/// @param ui The GUI context to update.
+/// @param x The x-coordinate of the pointer, in pixels.
+/// @param y The y-coordinate of the pointer, in pixels.
+/// @param key_code The key code of the key that was pressed.
+LLGUI_PUBLIC void key_repeat(gui::context_t *ui, float x, float y, uint16_t key_code);
+
+/// @summary Indicates a key was released.
+/// @param ui The GUI context to update.
+/// @param x The x-coordinate of the pointer, in pixels.
+/// @param y The y-coordinate of the pointer, in pixels.
+/// @param key_code The key code of the key that was released.
+/// @param modifiers A combination of interaction_e indicating which modifiers are active.
+LLGUI_PUBLIC void key_release(gui::context_t *ui, float x, float y, uint16_t key_code, uint32_t modifiers);
+
+/// @summary Sets the current hot item (hover/about to be interacted with.)
+/// @param ui The GUI context.
+/// @param id The application-defined identifier of the hot control.
+/// @return true if the item was set as the hot item.
+LLGUI_PUBLIC bool make_hot(gui::context_t *ui, uint32_t id);
+
+/// @summary Sets the current active item (control being interacted with.)
+/// @param ui The GUI context.
+/// @param id The application-defined identifier of the active control.
+LLGUI_PUBLIC void make_active(gui::context_t *ui, uint32_t id);
+
+/// @summary Sets a particular item as being not-hot.
+/// @param ui The GUI context.
+/// @param id The application-defined control identifier.
+LLGUI_PUBLIC void make_not_hot(gui::context_t *ui, uint32_t id);
+
+/// @summary Sets a particular item as being not-active.
+/// @param ui The GUI context.
+/// @param id The application-defined control identifier.
+LLGUI_PUBLIC void make_not_active(gui::context_t *ui, uint32_t id);
+
+/// @summary Queries a context to determine whether the interaction button has just been pressed.
+/// @param ui The GUI context to query.
+/// @return true if the interaction button was just pressed.
+LLGUI_PUBLIC bool interaction_starting(gui::context_t *ui);
+
+/// @summary Queries a context to determine whether the interaction button is currently down.
+/// @param ui The GUI context to query.
+/// @return true if the interaction button is active.
+LLGUI_PUBLIC bool interaction_active(gui::context_t *ui);
+
+/// @summary Queries a context to determine whether the interaction button has just been released.
+/// @param ui The GUI context to query.
+/// @return true if the interaction button was just released.
+LLGUI_PUBLIC bool interaction_ending(gui::context_t *ui);
+
+/// @summary Indicates the beginning of an update tick for a GUI. Call this 
+/// function prior to specifying any user input or executing any control logic.
+/// @param ui The GUI context being updated.
+/// @param current_time The current application time, in seconds.
+/// @param elapsed_time The time elapsed since the previous update tick, in seconds.
+LLGUI_PUBLIC void begin_update(gui::context_t *ui, float current_time, float elapsed_time);
+
+/// @summary Indicates that all input events for the current update tick have 
+/// been specified and updates the key history buffer.
+/// @param ui The GUI context being updated.
+LLGUI_PUBLIC void end_input(gui::context_t *ui);
+
+/// @summary Indicates the end of an update tick for a GUI.
+/// @param ui The GUI context being updated.
+LLGUI_PUBLIC void end_update(gui::context_t *ui);
 
 /*/////////////////////
 //   Namespace End   //
