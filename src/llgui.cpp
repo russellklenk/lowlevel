@@ -260,11 +260,12 @@ bool gui::create_bitmap_font(gui::bitmap_font_t *font, gui::bitmap_font_info_t c
         size_t nbuckets    = pow2_ge(info->GlyphCount / FONT_BUCKET_SIZE, FONT_MIN_BUCKETS);
         font->GlyphCount   = info->GlyphCount;
         font->BucketCount  = nbuckets;
-        font->GTable       = (uint32_t**)           malloc(nbuckets);
-        font->Glyphs       = (gui::bitmap_glyph_t*) malloc(info->GlyphCount);
+        font->GTable       = (uint32_t**) malloc(nbuckets * sizeof(uint32_t*));
+        font->Glyphs       = (gui::bitmap_glyph_t*)  malloc(info->GlyphCount);
         for (size_t i = 0; i < nbuckets; ++i)
         {
-            font->GTable[i]    = (uint32_t*) malloc(FONT_BUCKET_SIZE + 2);
+            size_t nitems   = FONT_BUCKET_SIZE + 2;
+            font->GTable[i] = (uint32_t*) malloc(nitems * sizeof(uint32_t));
             font->GTable[i][FONT_SIZE_INDEX]      = 0;
             font->GTable[i][FONT_CAPACITY_INDEX]  = FONT_BUCKET_SIZE;
         }
@@ -297,17 +298,21 @@ void gui::delete_bitmap_font(gui::bitmap_font_t *font)
 {
     if (font)
     {
-        if (font->FontName) free(font->FontName);
-        if (font->PageData) free(font->PageData);
-        if (font->KerningX) free(font->KerningX);
-        if (font->KerningB) free(font->KerningB);
-        if (font->KerningA) free(font->KerningA);
-        if (font->Glyphs)   free(font->Glyphs);
-        if (font->GTable)
+        if (font->FontName != NULL) free(font->FontName);
+        if (font->PageData != NULL) free(font->PageData);
+        if (font->KerningX != NULL) free(font->KerningX);
+        if (font->KerningB != NULL) free(font->KerningB);
+        if (font->KerningA != NULL) free(font->KerningA);
+        if (font->Glyphs   != NULL) free(font->Glyphs);
+        if (font->GTable   != NULL)
         {
             for (size_t i = 0; i < font->BucketCount; ++i)
             {
-                if (font->GTable[i]) free(font->GTable[i]);
+                if (font->GTable[i] != NULL)
+                {
+                    free(font->GTable[i]);
+                    font->GTable[i]  = NULL;
+                }
             }
             free(font->GTable);
         }
@@ -336,7 +341,7 @@ bool gui::define_glyph(gui::bitmap_font_t *font, gui::bitmap_glyph_t const *glyp
         uint32_t *b = (uint32_t *) realloc(font->GTable[bucket], n * sizeof(uint32_t));
         if (b == NULL) return false;
         font->GTable[bucket] = b;
-        font->GTable[bucket][FONT_CAPACITY_INDEX] = n;
+        font->GTable[bucket][FONT_CAPACITY_INDEX] = uint32_t(n);
     }
     font->GTable[bucket][FONT_SIZE_INDEX]++;
     font->GTable[bucket][count] = uint32_t(i);
@@ -358,9 +363,9 @@ bool gui::define_page(gui::bitmap_font_t *font, void const *src, size_t src_size
     {
         return false;
     }
-    size_t         rowl = (font->BitDepth  / 8) * font->PageWidth;
-    size_t         rowo = (flip_y) ?  font->PageHeight : 0;
-    size_t         rowi = (flip_y) ? -rowl : rowl;
+    ptrdiff_t      rowl = (font->BitDepth  / 8) * font->PageWidth;
+    ptrdiff_t      rowo = (flip_y) ?  font->PageHeight : 0;
+    ptrdiff_t      rowi = (flip_y) ? -rowl : rowl;
     uint8_t       *dstp = (uint8_t*)  font->PageData + (i * font->PageBytes) + (rowo * rowl);
     uint8_t const *srcp = (uint8_t const*) src;
     for (size_t r = 0;  r < font->PageHeight; ++r)
@@ -387,7 +392,7 @@ void gui::measure_string(gui::bitmap_font_t const *font, char const *str, size_t
         size_t   h = 0; // total height, in pixels
         uint32_t c = 0; // current  UTF-8 codepoint, 0xFFFFFFFFU = invalid
         uint32_t p = 0; // previous UTF-8 codepoint, 0xFFFFFFFFU = invalid
-        uint32_t const  m = font->BucketCount - 1;
+        uint32_t const  m = uint32_t(font->BucketCount - 1);
         char const     *n = next_codepoint(str, c);
         while (c != 0)
         {
@@ -542,13 +547,13 @@ void gui::flush_context(gui::context_t *ui)
     // ...
 }
 
-bool gui::hit_test(size_t x, size_t y, size_t w, size_t h, size_t test_x, size_t test_y)
+bool gui::hit_test(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t test_x, uint32_t test_y)
 {
     return (test_x >= x && test_x < (x + w) && 
             test_y >= y && test_y < (y + h));
 }
 
-bool gui::pointer_over(gui::context_t *ui, size_t x, size_t y, size_t w, size_t h)
+bool gui::pointer_over(gui::context_t *ui, uint32_t x, uint32_t y, uint32_t w, uint32_t h)
 {
     return (ui->PointerX >= x && ui->PointerX < (x + w) &&
             ui->PointerY >= y && ui->PointerY < (y + h));
@@ -632,6 +637,8 @@ void gui::key_release(gui::context_t *ui, float x, float y, uint16_t key_code, u
     {
         ui->ShiftDown = false;
     }
+    ui->PointerX = x;
+    ui->PointerY = y;
 }
 
 bool gui::make_hot(gui::context_t *ui, uint32_t id)
@@ -682,13 +689,12 @@ bool gui::interaction_ending(gui::context_t *ui)
 
 void gui::begin_update(gui::context_t *ui, float current_time, float elapsed_time)
 {
-    ui->UpdateTime  = current_time;
-    ui->DeltaTime   = elapsed_time;
+    ui->UpdateTime   = current_time;
+    ui->DeltaTime    = elapsed_time;
 
-    float seconds_per_blink = 1.0f / ui->BlinkRate;
-    float multiples = current_time * ui->BlinkRate;
-    float whole     = floorf(multiples);
-    float frac      = multiples - whole;
+    float multiples  = current_time * ui->BlinkRate;
+    float whole      = floorf(multiples);
+    float frac       = multiples - whole;
 
     if (int(whole) & 1) ui->CaretAlpha = 1.0f - frac;
     else ui->CaretAlpha = frac;
@@ -723,7 +729,7 @@ void gui::end_update(gui::context_t *ui)
     ui->KeyCount = 0;
 }
 
-gui::button_t* gui::button(gui::context_t *ui, uint32_t id, size_t x, size_t y, size_t w, size_t h, bool click, bool active)
+gui::button_t* gui::button(gui::context_t *ui, uint32_t id, uint32_t x, uint32_t y, uint32_t w, uint32_t h, bool click, bool active)
 {
     gui::button_t *control = NULL;
     size_t         index   = 0;
@@ -792,7 +798,7 @@ gui::button_t* gui::button(gui::context_t *ui, uint32_t id, size_t x, size_t y, 
     return control;
 }
 
-gui::toggle_t* gui::toggle(gui::context_t *ui, uint32_t id, size_t x, size_t y, size_t w, size_t h, bool default_set, bool click, bool active)
+gui::toggle_t* gui::toggle(gui::context_t *ui, uint32_t id, uint32_t x, uint32_t y, uint32_t w, uint32_t h, bool default_set, bool click, bool active)
 {
     gui::toggle_t *control = NULL;
     size_t         index   = 0;

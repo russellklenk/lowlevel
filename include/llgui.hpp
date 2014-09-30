@@ -325,7 +325,7 @@ LLGUI_PUBLIC void flush_context(gui::context_t *ui);
 /// @param test_x The x-coordinate of the point being tested.
 /// @param test_y The y-coordinate of the point being tested.
 /// @return true if the rectangle contains the test point.
-LLGUI_PUBLIC bool hit_test(size_t x, size_t y, size_t w, size_t h, size_t test_x, size_t test_y);
+LLGUI_PUBLIC bool hit_test(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t test_x, uint32_t test_y);
 
 /// @summary Performs a point-in-rectangle hit test using the current pointer position.
 /// @param ui The GUI context.
@@ -334,7 +334,7 @@ LLGUI_PUBLIC bool hit_test(size_t x, size_t y, size_t w, size_t h, size_t test_x
 /// @param w The width of the rectangle.
 /// @param h The height of the rectangle.
 /// @return true if the rectangle contains the interaction pointer.
-LLGUI_PUBLIC bool pointer_over(gui::context_t *ui, size_t x, size_t y, size_t w, size_t h);
+LLGUI_PUBLIC bool pointer_over(gui::context_t *ui, uint32_t x, uint32_t y, uint32_t w, uint32_t h);
 
 /// @summary Sets the current interaction pointer position.
 /// @param ui The GUI context to modify.
@@ -441,7 +441,7 @@ LLGUI_PUBLIC void end_update(gui::context_t *ui);
 /// @param click true to simulate a button click.
 /// @param active true if the button can be interacted with.
 /// @return Information about the current state of the button.
-LLGUI_PUBLIC gui::button_t* button(gui::context_t *ui, uint32_t id, size_t x, size_t y, size_t w, size_t h, bool click=false, bool active=true);
+LLGUI_PUBLIC gui::button_t* button(gui::context_t *ui, uint32_t id, uint32_t x, uint32_t y, uint32_t w, uint32_t h, bool click=false, bool active=true);
 
 /// @summary Implements the logic for a toggle button or checkbox.
 /// @param ui The GUI context that owns the button.
@@ -454,7 +454,7 @@ LLGUI_PUBLIC gui::button_t* button(gui::context_t *ui, uint32_t id, size_t x, si
 /// @param click true to simulate a button click.
 /// @param active true if the button can be interacted with.
 /// @return Information about the current state of the button.
-LLGUI_PUBLIC gui::toggle_t* toggle(gui::context_t *ui, uint32_t id, size_t x, size_t y, size_t w, size_t h, bool default_set=false, bool click=false, bool active=true);
+LLGUI_PUBLIC gui::toggle_t* toggle(gui::context_t *ui, uint32_t id, uint32_t x, uint32_t y, uint32_t w, uint32_t h, bool default_set=false, bool click=false, bool active=true);
 
 /*/////////////////////
 //   Namespace End   //
