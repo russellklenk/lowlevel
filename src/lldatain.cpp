@@ -2170,6 +2170,41 @@ bmfont_error:
     return false;
 }
 
+bool data::bmfont_change_extensions(data::bmfont_desc_t *desc, char const *new_ext)
+{
+    bool   result  = true;
+    size_t new_len = strlen(new_ext);
+
+    for (size_t page = 0, first = 0; page < desc->NumPages; ++page, first += desc->PageLength)
+    {
+        char  *filename = &desc->Pages->PageNames[first];
+        char  *name_end = filename + desc->PageLength;
+        while (name_end > filename)
+        {
+            if (*(name_end - 1) == '.')
+            {   // we found the start of the extension.
+                size_t cur_len = strlen(name_end);
+
+                if (new_len <= cur_len)
+                {
+                    for (size_t ch = 0; ch < new_len; ++ch)
+                    {   // overwrite the existing extension.
+                        *name_end++  = new_ext[ch];
+                    }
+                    for (size_t zb = 0; zb < cur_len - new_len; ++zb)
+                    {   // pad with zero bytes.
+                        *name_end++  = '\0';
+                    }
+                }
+                else result  = false;
+                break;
+            }
+            --name_end;
+        }
+    }
+    return result;
+}
+
 bool data::tga_header(void const *data, size_t data_size, data::tga_header_t *out_header)
 {
     uint8_t const *header_ptr = (uint8_t const*) data;

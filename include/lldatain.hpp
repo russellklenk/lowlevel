@@ -390,8 +390,7 @@ enum tga_colormaptype_e
     TGA_COLORMAPTYPE_INCLUDED               = 1
 };
 
-/// @summary Defines the image types supported by the image format. This library
-/// only supports loading of TGA_IMAGETYPE_UNCOMPRESSED_TRUE images.
+/// @summary Defines the image types supported by the image format. 
 enum tga_imagetype_e
 {
     TGA_IMAGETYPE_NO_IMAGE_DATA             = 0,
@@ -1058,6 +1057,15 @@ LLDATAIN_PUBLIC void json_free(data::json_item_t *item, data::json_allocator_t *
 /// various data blocks within the BMfont.
 /// @return true if the font was parsed successfully.
 LLDATAIN_PUBLIC bool bmfont_describe(void const *data, size_t data_size, data::bmfont_desc_t *out_desc);
+
+/// @summary Updates in-place the file extensions for the page filenames of a BMfont.
+/// This is useful if you have converted the image data to another format but don't 
+/// want to re-write the font file (some platforms might only export PNG but you want DDS.)
+/// @param desc The description populated by bmfont_describe().
+/// @param new_ext The new extension, without leading period, for example, "dds". This must
+/// be the same length (or less) than the existing extension.
+/// @return true if the extensions were changed.
+LLDATAIN_PUBLIC bool bmfont_change_extensions(data::bmfont_desc_t *desc, char const *new_ext);
 
 /// @summary Reads the header present in all TGA files.
 /// @param data The buffer from which the header data should be read.
