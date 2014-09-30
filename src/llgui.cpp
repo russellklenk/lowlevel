@@ -197,8 +197,9 @@ static inline bool clist_find(gui::control_list_t<T> *list, uint32_t id, size_t 
 /// @param list The list to update.
 /// @param id The unique identifier of the control being added.
 /// @param state The state of the control being added.
+/// @return The zero-based index of the control.
 template <typename T>
-static inline void clist_append(gui::control_list_t<T> *list, uint32_t id, T const &state)
+static inline size_t clist_append(gui::control_list_t<T> *list, uint32_t id, T const &state)
 {
     if (list->Count == list->Capacity)
     {
@@ -209,24 +210,27 @@ static inline void clist_append(gui::control_list_t<T> *list, uint32_t id, T con
         if (new_state != NULL) list->State  = new_state;
         if (new_ids   != NULL && new_state != NULL) list->Capacity = new_max;
     }
+    assert(list->Count < list->Capacity);
     list->Ids[list->Count]   = id;
     list->State[list->Count] = state;
-    list->Count++;
+    return list->Count++;
 }
 
 /// @summary Updates an existing control, or appends it if it doesn't exist.
 /// @param list The list to update.
 /// @param id The unique identifier of the control.
 /// @param state The current state of the control.
+/// @return The zero-based index of the control.
 template <typename T>
-static inline void clist_update(gui::control_list_t<T> *list, uint32_t id, T const &state)
+static inline size_t clist_update(gui::control_list_t<T> *list, uint32_t id, T const &state)
 {
     size_t index = 0;
     if (clist_find(list, id, &index))
     {
         list->State[index] = state;
+        return index;
     }
-    else clist_append(list, id, state);
+    else return clist_append(list, id, state);
 }
 
 /*////////////////////////
@@ -488,23 +492,24 @@ bool gui::create_context(gui::context_t *ui)
 {
     if (ui)
     {
-        ui->HotItem         = LLGUI_INVALID_ID;
-        ui->ActiveItem      = LLGUI_INVALID_ID;
-        ui->PointerX        = 0.0f;
-        ui->PointerY        = 0.0f;
-        ui->InteractX       = 0.0f;
-        ui->InteractY       = 0.0f;
-        ui->Interaction     = gui::INTERACTION_OFF;
-        ui->KeyCount        = 0;
-        ui->CapsLockOn      = false;
-        ui->ShiftDown       = false;
-        ui->UpdateTime      = 0.0f;
-        ui->DeltaTime       = 0.0f;
-        ui->RepeatRate      = 10.0f; // 10 characters per-second
-        ui->BlinkRate       = 2.0f;  // blink 2 times per-second
-        ui->CaretAlpha      = 1.0f;  // fully opaque
+        ui->HotItem     = LLGUI_INVALID_ID;
+        ui->ActiveItem  = LLGUI_INVALID_ID;
+        ui->PointerX    = 0.0f;
+        ui->PointerY    = 0.0f;
+        ui->InteractX   = 0.0f;
+        ui->InteractY   = 0.0f;
+        ui->Interaction = gui::INTERACTION_OFF;
+        ui->KeyCount    = 0;
+        ui->CapsLockOn  = false;
+        ui->ShiftDown   = false;
+        ui->UpdateTime  = 0.0f;
+        ui->DeltaTime   = 0.0f;
+        ui->RepeatRate  = 10.0f; // 10 characters per-second
+        ui->BlinkRate   = 2.0f;  // blink 2 times per-second
+        ui->CaretAlpha  = 1.0f;  // fully opaque
         gui::init_key_buffer(&ui->KeyHistory);
         clist_init(&ui->Buttons, 32);
+        clist_init(&ui->Toggles, 32);
         // more clist_init()
         // ...
         return true;
@@ -518,6 +523,7 @@ void gui::delete_context(gui::context_t *ui)
     {
         ui->HotItem    = LLGUI_INVALID_ID;
         ui->ActiveItem = LLGUI_INVALID_ID;
+        clist_free(&ui->Toggles);
         clist_free(&ui->Buttons);
         // more clist_free()
         // ...
@@ -531,6 +537,7 @@ void gui::flush_context(gui::context_t *ui)
     ui->Interaction = gui::INTERACTION_OFF;
     ui->KeyCount    = 0;
     clist_flush(&ui->Buttons);
+    clist_flush(&ui->Toggles);
     // more clist_flush()
     // ...
 }
@@ -709,10 +716,151 @@ void gui::end_update(gui::context_t *ui)
     {
         ui->Interaction ^= gui::INTERACTION_BEGIN;
     }
-    if ((ui->Interaction  & gui::INTERACTION_END) != 0)
+    if ((ui->Interaction & gui::INTERACTION_END) != 0)
     {
         ui->Interaction  = gui::INTERACTION_OFF;
     }
     ui->KeyCount = 0;
+}
+
+gui::button_t* gui::button(gui::context_t *ui, uint32_t id, size_t x, size_t y, size_t w, size_t h, bool click, bool active)
+{
+    gui::button_t *control = NULL;
+    size_t         index   = 0;
+    bool           isHot   = false;
+    bool           clicked = false;
+
+    // create the control if it doesn't already exist.
+    if (!clist_find(&ui->Buttons, id, &index))
+    {
+        gui::button_t    state;
+        state.XYWH[0]    = x;
+        state.XYWH[1]    = y;
+        state.XYWH[2]    = w;
+        state.XYWH[3]    = h;
+        state.State      = uint32_t(index);
+        state.IsHot      = false;
+        state.IsActive   = false;
+        state.WasClicked = false;
+        index = clist_append(&ui->Buttons, id, state);
+    }
+
+    control = &ui->Buttons.State[index];
+    control->XYWH[0] = x;
+    control->XYWH[1] = y;
+    control->XYWH[2] = w;
+    control->XYWH[3] = h;
+    isHot  = gui::pointer_over(ui, x, y, w, h);
+
+    if (click)
+    {
+        control->IsHot      = isHot;
+        control->WasClicked = true;
+        return control;
+    }
+    if (isHot && active)
+    {
+        gui::make_hot(ui, id);
+    }
+    else
+    {
+        gui::make_not_hot(ui, id);
+        gui::make_not_active(ui, id);
+    }
+    if (ui->ActiveItem == id)
+    {
+        if (gui::interaction_ending(ui))
+        {
+            if (ui->HotItem == id)
+            {
+                clicked = true;
+            }
+            gui::make_not_active(ui, id);
+        }
+    }
+    else if (isHot && active)
+    {
+        if (gui::interaction_starting(ui))
+        {
+            gui::make_active(ui, id);
+        }
+    }
+
+    control->IsHot      =(id == ui->HotItem);
+    control->IsActive   =(id == ui->ActiveItem);
+    control->WasClicked = clicked;
+    return control;
+}
+
+gui::toggle_t* gui::toggle(gui::context_t *ui, uint32_t id, size_t x, size_t y, size_t w, size_t h, bool default_set, bool click, bool active)
+{
+    gui::toggle_t *control = NULL;
+    size_t         index   = 0;
+    bool           isHot   = false;
+    bool           clicked = false;
+
+    // create the control if it doesn't already exist.
+    if (!clist_find(&ui->Toggles, id, &index))
+    {
+        gui::toggle_t    state;
+        state.XYWH[0]    = x;
+        state.XYWH[1]    = y;
+        state.XYWH[2]    = w;
+        state.XYWH[3]    = h;
+        state.State      = uint32_t(index);
+        state.IsHot      = false;
+        state.IsActive   = false;
+        state.WasClicked = false;
+        state.IsOn       = default_set;
+        index = clist_append(&ui->Toggles, id, state);
+    }
+
+    control = &ui->Toggles.State[index];
+    control->XYWH[0] = x;
+    control->XYWH[1] = y;
+    control->XYWH[2] = w;
+    control->XYWH[3] = h;
+    isHot  = gui::pointer_over(ui, x, y, w, h);
+
+    if (click)
+    {
+        control->IsHot      = isHot;
+        control->WasClicked = true;
+        control->IsOn       =!control->IsOn;
+        return control;
+    }
+    if (isHot && active)
+    {
+        gui::make_hot(ui, id);
+    }
+    else
+    {
+        gui::make_not_hot(ui, id);
+        gui::make_not_active(ui, id);
+    }
+    if (ui->ActiveItem == id)
+    {
+        if (gui::interaction_ending(ui))
+        {
+            if (ui->HotItem == id)
+            {
+                clicked = true;
+            }
+            gui::make_not_active(ui, id);
+        }
+    }
+    else if (isHot && active)
+    {
+        if (gui::interaction_starting(ui))
+        {
+            gui::make_active(ui, id);
+        }
+    }
+
+    control->IsHot      =(id == ui->HotItem);
+    control->IsActive   =(id == ui->ActiveItem);
+    control->WasClicked = clicked;
+    control->IsOn       = clicked ? !control->IsOn : control->IsOn;
+    return control;
 }
 

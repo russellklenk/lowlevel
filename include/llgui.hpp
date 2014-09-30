@@ -161,14 +161,24 @@ struct key_buffer_t
 /// standard clickable button. This structure is returned to the application.
 struct button_t
 {
-    size_t             X;           /// The x-coordinate of the upper-left corner of the control.
-    size_t             Y;           /// The y-coordinate of the upper-left corner of the control.
-    size_t             Width;       /// The width of the control, in pixels.
-    size_t             Height;      /// The height of the control, in pixels.
+    uint32_t           XYWH[4];     /// The bounding rectangle of the control.
     uint32_t           State;       /// An application-defined value associated with the button.
     bool               IsHot;       /// true if the control is mouse is hovering over the control.
     bool               IsActive;    /// true if the control is being interacted with.
     bool               WasClicked;  /// true if the button was clicked.
+};
+
+/// @summary Defines the state associated with a control that behaves like a 
+/// toggle button (or checkbox, if you prefer), which can be either on or off.
+/// This structure is returned to the application.
+struct toggle_t
+{
+    uint32_t           XYWH[4];     /// The bounding rectangle of the control.
+    uint32_t           State;       /// An application-defined value associated with the button.
+    bool               IsHot;       /// true if the control is mouse is hovering over the control.
+    bool               IsActive;    /// true if the control is being interacted with.
+    bool               WasClicked;  /// true if the button was clicked.
+    bool               IsOn;        /// true if the button is toggled on.
 };
 
 /// @summary A helper structure representing a list of controls of type T, where
@@ -182,6 +192,7 @@ struct control_list_t
     T                 *State;       /// The list of control state.
 };
 typedef gui::control_list_t<gui::button_t> button_list_t;
+typedef gui::control_list_t<gui::toggle_t> toggle_list_t;
 /// more
 /// ...
 
@@ -207,6 +218,7 @@ struct context_t
     float              BlinkRate;   /// The caret blink rate, in cycles per-second.
     float              CaretAlpha;  /// The opacity value of the caret.
     gui::button_list_t Buttons;     /// List of cached button state.
+    gui::toggle_list_t Toggles;     /// List of cached toggle state.
 };
 
 /*////////////////
@@ -418,6 +430,31 @@ LLGUI_PUBLIC void end_input(gui::context_t *ui);
 /// @summary Indicates the end of an update tick for a GUI.
 /// @param ui The GUI context being updated.
 LLGUI_PUBLIC void end_update(gui::context_t *ui);
+
+/// @summary Implements the logic for a standard clickable button.
+/// @param ui The GUI context that owns the button.
+/// @param id The unique identifier of the button, defined by the application.
+/// @param x The upper-left corner of the button bounds, in pixels.
+/// @param y The upper-left corner of the button bounds, in pixels.
+/// @param w The width of the button, in pixels.
+/// @param h The height of the button, in pixels.
+/// @param click true to simulate a button click.
+/// @param active true if the button can be interacted with.
+/// @return Information about the current state of the button.
+LLGUI_PUBLIC gui::button_t* button(gui::context_t *ui, uint32_t id, size_t x, size_t y, size_t w, size_t h, bool click=false, bool active=true);
+
+/// @summary Implements the logic for a toggle button or checkbox.
+/// @param ui The GUI context that owns the button.
+/// @param id The unique identifier of the button, defined by the application.
+/// @param x The upper-left corner of the button bounds, in pixels.
+/// @param y The upper-left corner of the button bounds, in pixels.
+/// @param w The width of the button, in pixels.
+/// @param h The height of the button, in pixels.
+/// @param default_set true if the state is ON by default.
+/// @param click true to simulate a button click.
+/// @param active true if the button can be interacted with.
+/// @return Information about the current state of the button.
+LLGUI_PUBLIC gui::toggle_t* toggle(gui::context_t *ui, uint32_t id, size_t x, size_t y, size_t w, size_t h, bool default_set=false, bool click=false, bool active=true);
 
 /*/////////////////////
 //   Namespace End   //
