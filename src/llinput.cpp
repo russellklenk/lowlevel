@@ -1,7 +1,7 @@
 /*/////////////////////////////////////////////////////////////////////////////
-/// @summary Implements a rectangle packer using an (unbalanced) binary tree
-/// subdividing the space in the master rectangle. The algorithm is described
-/// at http://www.blackpawn.com/texts/lightmaps.
+/// @summary Implements an interface to the input system based on the
+/// abstractions for keyboards, mice and joysticks provided by GLFW. This
+/// shouldn't be too hard to port to another underlying system.
 /// @author Russell Klenk (contact@russellklenk.com)
 ///////////////////////////////////////////////////////////////////////////80*/
 
@@ -13,7 +13,6 @@
 /*/////////////////
 //   Constants   //
 /////////////////*/
-#define MAX_INPUT_CONTEXTS    4U
 
 /*///////////////
 //   Globals   //
@@ -21,89 +20,42 @@
 /// @summary A global table of all input contexts. Nasty, but GLFW doesn't
 /// allow us to pass through a context pointer in the callbacks, and we don't
 /// want to take over the user pointer on the window.
-static input::context_t gContextList[MAX_INPUT_CONTEXTS];
+static input::context_t* gContextList[LLINPUT_MAX_CONTEXTS] = {NULL};
 
 /// @summary A global table of GLFW window handles associated with input contexts.
-static GLFWwindow*      gWindowList[MAX_INPUT_CONTEXTS];
+static GLFWwindow*       gWindowList[LLINPUT_MAX_CONTEXTS]  = {NULL};
 
 /// @summary The number of valid input context records.
-static size_t           gContextCount = 0;
+static size_t            gContextCount = 0;
 
 /*///////////////////////
 //   Local Functions   //
 ///////////////////////*/
-/// @summary Allocates a new input context for the specified window.
-/// @param win The window associated with the input context.
-/// @return The input context record allocated to the window, or NULL.
-static input::context_t* alloc_context(GLFWwindow *win)
-{
-    if (gContextCount == MAX_INPUT_CONTEXTS)
-        return NULL;
-
-    // to support HiDPI devices, we need to be able to calculate
-    // the scale factor from window client space to pixels.
-    int win_w  = 0;
-    int win_h  = 0;
-    int buf_w  = 0;
-    int buf_h  = 0;
-    glfwGetWindowSize(win, &win_w, &win_h);
-    glfwGetFramebufferSize(win, &buf_w, &buf_h);
-
-    // initialize the input context to its default state.
-    input::context_t  *ctx = &gContextList[gContextCount];
-    ctx->Window            = win;
-    ctx->ScaleX            = float(buf_w) / float(win_w);
-    ctx->ScaleY            = float(buf_h) / float(win_h);
-    ctx->MouseX            = 0;
-    ctx->MouseY            = 0;
-    ctx->MouseState        = 0;
-    ctx->MouseModifiers    = 0;
-    ctx->KeyboardModifiers = 0;
-    for (size_t i = 0; i < INPUT_KEY_WORDS; ++i)
-        ctx->KeyboardState[i] = 0;
-
-    gWindowList[gContextCount++] = win;
-    return ctx;
-}
-
 /// @summary Finds the input context attached to a given window.
 /// @param win The window associated with the input context.
 /// @return The input context record allocated to the window, or NULL.
 static input::context_t* find_context(GLFWwindow *win)
 {
-    for (size_t i = 0; i < gContextCount; ++i)
+    size_t const n = gContextCount;
+    for (size_t  i = 0; i < n; ++i)
     {
         if (gWindowList[i] == win)
-            return &gContextList[i];
+            return gContextList[i];
     }
     return NULL;
 }
 
-/// @summary Releases the input context associated with a given window.
-/// @param win The window associated with the input context.
-/// @return true if a context was associated with win.
-static bool free_context(GLFWwindow *win)
+/// @summary Generates a bitmap where a bit is set if the associated controller is connected.
+/// @param state The input state snapshot to generate the bitmap for.
+/// @return The bitmap representing the set of connected controllers.
+static uint32_t controller_bitmap(input::snapshot_t const *state)
 {
-    for (size_t i = 0; i < gContextCount; ++i)
+    uint32_t bitmap = 0;
+    for (size_t i = 0; i < state->ControllerCount; ++i)
     {
-        if (gWindowList[i] == win)
-        {
-            if (i == (gContextCount - 1))
-            {
-                // poppiing the context from the back of the list.
-                gContextCount--;
-                return true;
-            }
-            else
-            {
-                gWindowList [i] = gWindowList [gContextCount-1];
-                gContextList[i] = gContextList[gContextCount-1];
-                gContextCount--;
-                return true;
-            }
-        }
+        bitmap |= (1 << state->ControllerIds[i]);
     }
-    return false;
+    return bitmap;
 }
 
 /// @summary Callback invoked by GLFW to report the current cursor position.
@@ -113,7 +65,7 @@ static bool free_context(GLFWwindow *win)
 static void glfw_cursor(GLFWwindow *win, double x, double y)
 {
     input::context_t *ctx = find_context(win);
-    if (ctx)
+    if (ctx != NULL)
     {
         ctx->MouseX = float(x) * ctx->ScaleX;
         ctx->MouseY = float(y) * ctx->ScaleY;
@@ -128,7 +80,7 @@ static void glfw_cursor(GLFWwindow *win, double x, double y)
 static void glfw_button(GLFWwindow *win, int button, int action, int modifiers)
 {
     input::context_t *ctx = find_context(win);
-    if (ctx)
+    if (ctx != NULL)
     {
         if (action == GLFW_PRESS)
         {
@@ -152,10 +104,10 @@ static void glfw_button(GLFWwindow *win, int button, int action, int modifiers)
 static void glfw_key(GLFWwindow *win, int key, int scancode, int action, int modifiers)
 {
     input::context_t *ctx = find_context(win);
-    if (ctx)
+    if (ctx != NULL)
     {
-        size_t   word = (key - INPUT_KEY_OFFSET) >> 5;
-        uint32_t bitx = (key - INPUT_KEY_OFFSET) & 0x1F;
+        size_t   word = (key - LLINPUT_KEY_OFFSET) >> 5;
+        uint32_t bitx = (key - LLINPUT_KEY_OFFSET) & 0x1F;
 
         if (action == GLFW_PRESS)
         {
@@ -173,89 +125,208 @@ static void glfw_key(GLFWwindow *win, int key, int scancode, int action, int mod
 /*///////////////////////
 //  Public Functions   //
 ///////////////////////*/
-bool input::attach(GLFWwindow *win)
+bool input::create_context(input::context_t *context, GLFWwindow *window)
 {
-    input::context_t *ctx = find_context(win);
+    input::context_t *ctx = find_context(window);
     if (ctx)
     {
-        // already attached to this window.
-        return true;
+        // there's already a context attached to this window.
+        // this is only okay if it's the same as the one being attached.
+        return (ctx == context);
     }
 
-    ctx = alloc_context(win);
-    if (ctx)
+    if (gContextCount == LLINPUT_MAX_CONTEXTS)
     {
-        glfwSetKeyCallback(win, glfw_key);
-        glfwSetCursorPosCallback(win, glfw_cursor);
-        glfwSetMouseButtonCallback(win, glfw_button);
-        return true;
+        // no additional contexts can be attached.
+        return false;
     }
-    else return false;
+
+    size_t const index  = gContextCount++;
+    gContextList[index] = context;
+    gWindowList[index]  = window;
+
+    // to support HiDPI devices, we need to be able to calculate
+    // the scale factor from window client space to pixels.
+    int win_w  = 0;
+    int win_h  = 0;
+    int buf_w  = 0;
+    int buf_h  = 0;
+    glfwGetWindowSize(window, &win_w, &win_h);
+    glfwGetFramebufferSize(window, &buf_w, &buf_h);
+
+    // initialize the input context to its default state.
+    context->Window            = window;
+    context->ScaleX            = float(buf_w) / float(win_w);
+    context->ScaleY            = float(buf_h) / float(win_h);
+    context->MouseX            = 0;
+    context->MouseY            = 0;
+    context->MouseState        = 0;
+    context->MouseModifiers    = 0;
+    context->KeyboardModifiers = 0;
+    for (size_t i = 0; i < LLINPUT_KEY_WORDS; ++i)
+        context->KeyboardState[i] = 0;
+
+    glfwSetKeyCallback(window, glfw_key);
+    glfwSetCursorPosCallback(window, glfw_cursor);
+    glfwSetMouseButtonCallback(window, glfw_button);
+    return true;
 }
 
-void input::detach(GLFWwindow *win)
+void input::delete_context(input::context_t *context)
 {
-    if (free_context(win))
+    bool   found = false;
+    size_t index = 0;
+    size_t const n = gContextCount;
+    for (size_t  i = 0; i < n; ++i)
     {
-        glfwSetKeyCallback(win, NULL);
-        glfwSetCursorPosCallback(win, NULL);
-        glfwSetMouseButtonCallback(win, NULL);
-    }
-}
-
-void input::snapshot(input::snapshot_t *dst, GLFWwindow *win)
-{
-    input::context_t *ctx = find_context(win);
-    if (ctx)
-    {
-        // copy event-driven attributes from the context.
-        dst->Window            = ctx->Window;
-        dst->ScaleX            = ctx->ScaleX;
-        dst->ScaleY            = ctx->ScaleY;
-        dst->MouseX            = ctx->MouseX;
-        dst->MouseY            = ctx->MouseY;
-        dst->MouseState        = ctx->MouseState;
-        dst->MouseModifiers    = ctx->MouseModifiers;
-        dst->KeyboardModifiers = ctx->KeyboardModifiers;
-        for (size_t i = 0; i < INPUT_KEY_WORDS; ++i)
-            dst->KeyboardState[i] = ctx->KeyboardState[i];
-
-        // poll for the current joystick state.
-        size_t  ncontrollers = 0;
-        dst->ControllerCount = 0;
-        for (int i = GLFW_JOYSTICK_1; i <= GLFW_JOYSTICK_LAST; ++i)
+        if (gContextList[i] == context)
         {
-            if (glfwJoystickPresent(i) == GL_TRUE)
+            index = i;
+            found = true;
+            break;
+        }
+    }
+
+    glfwSetKeyCallback(gWindowList[index], NULL);
+    glfwSetCursorPosCallback(gWindowList[index], NULL);
+    glfwSetMouseButtonCallback(gWindowList[index], NULL);
+    gWindowList [index] = gWindowList[gContextCount  - 1];
+    gContextList[index] = gContextList[gContextCount - 1];
+    gContextCount--;
+}
+
+void input::snapshot(input::snapshot_t *dst, input::context_t *context)
+{
+    // copy event-driven attributes from the context.
+    dst->Window            = context->Window;
+    dst->Time              = glfwGetTime();
+    dst->ScaleX            = context->ScaleX;
+    dst->ScaleY            = context->ScaleY;
+    dst->MouseX            = context->MouseX;
+    dst->MouseY            = context->MouseY;
+    dst->MouseState        = context->MouseState;
+    dst->MouseModifiers    = context->MouseModifiers;
+    dst->KeyboardModifiers = context->KeyboardModifiers;
+    for (size_t i = 0; i < LLINPUT_KEY_WORDS; ++i)
+        dst->KeyboardState[i] = context->KeyboardState[i];
+
+    // poll for the current joystick state.
+    size_t  ncontrollers = 0;
+    dst->ControllerCount = 0;
+    for (int i = GLFW_JOYSTICK_1; i <= GLFW_JOYSTICK_LAST; ++i)
+    {
+        if (glfwJoystickPresent(i) == GL_TRUE)
+        {
+            int naxes    = 0;
+            int nbuttons = 0;
+            float   const *axes    = glfwGetJoystickAxes(i, &naxes);
+            uint8_t const *buttons = glfwGetJoystickButtons(i, &nbuttons);
+
+            if (naxes > LLINPUT_MAX_CONTROLLER_AXES)
+                naxes = LLINPUT_MAX_CONTROLLER_AXES;
+
+            if (nbuttons > LLINPUT_MAX_CONTROLLER_BUTTONS)
+                nbuttons = LLINPUT_MAX_CONTROLLER_BUTTONS;
+
+            dst->ControllerIds[ncontrollers] = i;
+            dst->ControllerAxisCount[ncontrollers] = size_t(naxes);
+            dst->ControllerButtonCount[ncontrollers] = size_t(nbuttons);
+
+            for (int j = 0; j < naxes; ++j)
             {
-                int naxes    = 0;
-                int nbuttons = 0;
-                float   const *axes    = glfwGetJoystickAxes(i, &naxes);
-                uint8_t const *buttons = glfwGetJoystickButtons(i, &nbuttons);
+                dst->ControllerAxes[ncontrollers][j] = axes[j];
+            }
+            for (int j = 0; j < nbuttons; ++j)
+            {
+                dst->ControllerButtons[ncontrollers][j] = buttons[j];
+            }
+            ncontrollers++;
 
-                if (naxes > INPUT_MAX_CONTROLLER_AXES)
-                    naxes = INPUT_MAX_CONTROLLER_AXES;
+            if (ncontrollers == LLINPUT_MAX_CONTROLLERS)
+                break;
+        }
+    }
+    dst->ControllerCount = ncontrollers;
+}
 
-                if (nbuttons > INPUT_MAX_CONTROLLER_BUTTONS)
-                    nbuttons = INPUT_MAX_CONTROLLER_BUTTONS;
+void input::events(input::events_t *ev, input::snapshot_t const *s0, input::snapshot_t const *s1)
+{
+    double dt = 0.0;
 
-                dst->ControllerIds[ncontrollers] = i;
-                dst->ControllerAxisCount[ncontrollers] = size_t(naxes);
-                dst->ControllerButtonCount[ncontrollers] = size_t(nbuttons);
+    if (s0->Time < s1->Time)
+        dt = s1->Time - s0->Time;
+    else
+        dt = s0->Time - s1->Time;
 
-                for (int j = 0; j < naxes; ++j)
-                {
-                    dst->ControllerAxes[ncontrollers][j] = axes[j];
-                }
-                for (int j = 0; j < nbuttons; ++j)
-                {
-                    dst->ControllerButtons[ncontrollers][j] = buttons[j];
-                }
-                ncontrollers++;
+    ev->Time             = s1->Time;
+    ev->TimeDelta        = dt;
+    ev->MousePosition[0] = s1->MouseX;
+    ev->MousePosition[1] = s1->MouseY;
+    ev->MouseDelta[0]    = s1->MouseX - s0->MouseX;
+    ev->MouseDelta[1]    = s1->MouseY - s0->MouseY;
+    ev->MouseChanges     = s1->MouseState ^ s0->MouseState;
+    ev->MouseStates      = s1->MouseState;
+    for (size_t i = 0; i < LLINPUT_KEY_WORDS; ++i)
+    {
+        ev->KeyChanges[i]  = s1->KeyboardState[i] ^ s0->KeyboardState[i];
+        ev->KeyStates[i]   = s1->KeyboardState[i];
+    }
 
-                if (ncontrollers == INPUT_MAX_CONTROLLERS)
-                    break;
+    uint32_t curr_connected    = controller_bitmap(s1);
+    uint32_t prev_connected    = controller_bitmap(s0);
+    uint32_t connected_changes = (curr_connected    ^  prev_connected);
+    ev->ControllerConnect      = (connected_changes &  curr_connected);
+    ev->ControllerDisconnect   = (connected_changes & ~curr_connected);
+    ev->ControllerCount        = s1->ControllerCount;
+
+    int    const *id0 = s0->ControllerIds;
+    int    const *id1 = s1->ControllerIds;
+    size_t const   n0 = s0->ControllerCount;
+    size_t const   n1 = s1->ControllerCount;
+    for (size_t i = 0;  i < n1; ++i)
+    {   // find controller s1->ControllerIds[i] in s0.
+        int const  c1 = id1[i];
+        size_t  index = 0;
+        bool    found = false;
+        for (size_t j = 0; j < n0; ++j)
+        {
+            if (id0[j] == c1)
+            {
+                index = j;
+                found = true;
+                break;
             }
         }
-        dst->ControllerCount = ncontrollers;
+
+        input::controller_ev_t &cev = ev->Controller[i];
+        ev->ControllerIds[i] = c1;
+        cev.AxisCount        = s1->ControllerAxisCount[i];
+        cev.ButtonCount      = s1->ControllerButtonCount[i];
+        if (found)
+        {   // calculate delta values.
+            for (size_t k = 0; k < cev.AxisCount; ++k)
+            {
+                cev.AxisValues[k]  = s1->ControllerAxes[i][k];
+                cev.AxisDeltas[k]  = s1->ControllerAxes[i][k] - s0->ControllerAxes[index][k];
+            }
+            for (size_t k = 0; k < cev.ButtonCount; ++k)
+            {
+                cev.ButtonStates[k]= s1->ControllerButtons[i][k];
+                cev.ButtonDeltas[k]= s1->ControllerButtons[i][k] - s0->ControllerButtons[index][k];
+            }
+        }
+        else
+        {   // just copy the current values.
+            for (size_t k = 0; k < cev.AxisCount; ++k)
+            {
+                cev.AxisValues[k]  = s1->ControllerAxes[i][k];
+                cev.AxisDeltas[k]  = 0.0;
+            }
+            for (size_t k = 0; k < cev.ButtonCount; ++k)
+            {
+                cev.ButtonStates[k]= s1->ControllerButtons[i][k];
+                cev.ButtonDeltas[k]= 0;
+            }
+        }
     }
 }
