@@ -125,49 +125,6 @@ namespace gl {
 /*//////////////////
 //   Data Types   //
 //////////////////*/
-/// @summary Flags used with the rectangle packer.
-enum pk_flags_e
-{
-    PACKER_FLAGS_NONE    =  0,
-    PACKER_FLAGS_USED    = (1 << 0)
-};
-
-/// @summary Represents a single node in a binary tree used for packing
-/// image rectangles within a larger texture.
-struct pknode_t
-{
-    uint32_t Flags;        /// Combination of pk_flags_e.
-    uint32_t Index;        /// Index of the associated packer_rect_t
-    uint32_t Child[2];     /// Index of the child nodes, 0 if no child
-    uint32_t Bound[4];     /// Left-Top-Right-Bottom bounding rectangle
-};
-
-/// @summary Represents a single sub-rectangle within a larger image. This
-/// data is stored separately from nodes for more cache-friendly behavior.
-struct pkrect_t
-{
-    size_t   X;            /// X-coordinate of upper-left corner
-    size_t   Y;            /// Y-coordinate of upper-left corner
-    size_t   Width;        /// Width of the rectangle, in pixels
-    size_t   Height;       /// Height of the rectangle, in pixels
-    uint32_t Image;        /// Application-defined image identifier
-    uint32_t Flags;        /// Flag bits, copied from the node
-};
-
-/// @summary Stores the data necessary for maintaining the set of sub-images
-/// packed together within a single larger image.
-struct packer_t
-{
-    size_t        Width;   /// Width of primary image, in pixels
-    size_t        Height;  /// Height of primary image, in pixels
-    size_t        Free;    /// Total area currently unused
-    size_t        Used;    /// Total area currently used
-    size_t        Capacity;/// The capacity of the node and rectangle storage.
-    size_t        Count;   /// The number of sub-rectangles currently defined.
-    gl::pknode_t *Nodes;   /// Storage for node instances
-    gl::pkrect_t *Rects;   /// Storage for rectangle data
-};
-
 /// @summary Describes an active GLSL attribute.
 struct attribute_desc_t
 {
@@ -866,36 +823,6 @@ LLOPENGL_PUBLIC void transfer_pixels_d2h(gl::pixel_transfer_d2h_t *transfer);
 /// pixel data is copied to a single mip-level of a texture image.
 /// @param transfer An object describing the transfer operation to execute.
 LLOPENGL_PUBLIC void transfer_pixels_h2d(gl::pixel_transfer_h2d_t *transfer);
-
-/// @summary Initializes an packer for dynamically packing several rectangles
-/// representing images onto a single, larger rectangle.
-/// @param packer The rectangle packer to initialize.
-/// @param width The width of the master rectangle.
-/// @param height The height of the master rectangle.
-/// @param capacity The expected number of sub-rectangles.
-LLOPENGL_PUBLIC bool create_packer(gl::packer_t *packer, size_t width, size_t height, size_t capacity);
-
-/// @summary Frees resources associated with a rectangle packer.
-/// @param packer The rectangle packer to delete.
-LLOPENGL_PUBLIC void delete_packer(gl::packer_t *packer);
-
-/// @summary Resets a packer to its initial empty state, without freeing the
-/// underlying storage resources or modifying the target rectangle size.
-/// @param packer The rectangle packer to reset.
-LLOPENGL_PUBLIC void reset_packer(gl::packer_t *packer);
-
-/// @summary Attempts to position a sub-rectangle within the master rectangle.
-/// @param packer The packer used to position sub-rectangles.
-/// @param width The un-padded width of the sub-rectangle.
-/// @param height The un-padded height of the sub-rectangle.
-/// @param hpad The amount of horizontal padding to use.
-/// @param vpad The amount of vertical padding to use.
-/// @param id The application-defined identifier for the sub-rectangle.
-/// @param rect On return, this address is filled with information about the
-/// sub-rectangle within the master image. If the sub-rectangle will not fit
-/// within the master rectangle, this value is not modified.
-/// @return true if the sub-rectangle was positioned on the master rectangle.
-LLOPENGL_PUBLIC bool packer_insert(gl::packer_t *packer, size_t width, size_t height, size_t hpad, size_t vpad, uint32_t id, gl::pkrect_t *rect);
 
 /// @summary Initializes a sprite batch with the specified capacity.
 /// @param batch The sprite batch.

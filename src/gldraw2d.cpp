@@ -6,6 +6,8 @@
 /*////////////////
 //   Includes   //
 ////////////////*/
+#include <assert.h>
+#include <string.h>
 #include "gldraw2d.hpp"
 #include "llgui.hpp"
 
@@ -18,11 +20,108 @@
 //   Globals   //
 ///////////////*/
 
+/*//////////////////
+//   Data Types   //
+//////////////////*/
 
 /*///////////////////////
 //   Local Functions   //
 ///////////////////////*/
+/// @summary Attempt to find a node that can contain the given area within the
+/// rectangle packer binary tree, performing any necessary spatial subdivision.
+/// @param p The rectangle packer being updated.
+/// @param n The zero-based index of the node at which the insertion is being attempted.
+/// @param w The width of the rectangle being inserted.
+/// @param h The height of the rectangle being inserted.
+/// @return The node at which the rectangle should be inserted, or NULL if the 
+/// rectangle cannot fit within the remaining area of the master rectangle.
+static r2d::pknode_t* node_insert(r2d::packer_t *p, uint32_t n, size_t w, size_t h)
+{
+    r2d::pknode_t *node  = &p->Nodes[n];
+    if (node->Child[0]  != 0 && node->Child[1] != 0)
+    {
+        // this node is not a leaf node, so attempt the insert in the subtree.
+        r2d::pknode_t *t = node_insert(p, node->Child[0], w, h);
+        if (t != NULL)   return t;
+        else return node_insert(p, node->Child[1], w, h);
+    }
+    else
+    {
+        if (node->Flags & r2d::PACKER_FLAGS_USED)
+            return NULL;
 
+        // if the sub-rect won't fit, don't continue down this path.
+        uint32_t rect_width  = node->Bound[2] - node->Bound[0];
+        uint32_t rect_height = node->Bound[3] - node->Bound[1];
+        if (w  > rect_width || h  > rect_height)
+            return NULL;
+
+        // if the sub-rect fits exactly, we'll store it at 'node'.
+        if (w == rect_width && h == rect_height)
+            return node;
+
+        // otherwise, we'll split the space at this node into a used
+        // portion, stored in node->Child[0], and an unsed portion in
+        // stored in node->Child[1].
+        r2d::pknode_t  a;
+        a.Flags      = r2d::PACKER_FLAGS_NONE;
+        a.Index      = 0xFFFFFFFFU;
+        a.Child[0]   = 0;
+        a.Child[1]   = 0;
+
+        r2d::pknode_t  b;
+        b.Flags      = r2d::PACKER_FLAGS_NONE;
+        b.Index      = 0xFFFFFFFFU;
+        b.Child[0]   = 0;
+        b.Child[1]   = 0;
+
+        uint32_t dw  = rect_width  - w;
+        uint32_t dh  = rect_height - h;
+        if (dw > dh)
+        {
+            a.Bound[0] = node->Bound[0];
+            a.Bound[1] = node->Bound[1];
+            a.Bound[2] = node->Bound[0] + uint32_t(w);
+            a.Bound[3] = node->Bound[3];
+
+            b.Bound[0] = node->Bound[0] + uint32_t(w);
+            b.Bound[1] = node->Bound[1];
+            b.Bound[2] = node->Bound[2];
+            b.Bound[3] = node->Bound[3];
+        }
+        else
+        {
+            a.Bound[0] = node->Bound[0];
+            a.Bound[1] = node->Bound[1];
+            a.Bound[2] = node->Bound[2];
+            a.Bound[3] = node->Bound[1] + uint32_t(h);
+
+            b.Bound[0] = node->Bound[0];
+            b.Bound[1] = node->Bound[1] + uint32_t(h);
+            b.Bound[2] = node->Bound[2];
+            b.Bound[3] = node->Bound[3];
+        }
+
+        if (p->Count == p->Capacity)
+        {
+            size_t        nc =  p->Capacity  >  2048 ? (p->Capacity + 2048) : p->Capacity    * 2;
+            r2d::pknode_t *N = (r2d::pknode_t*) realloc(p->Nodes, nc * sizeof(r2d::pknode_t) * 3);
+            r2d::pkrect_t *R = (r2d::pkrect_t*) realloc(p->Rects, nc * sizeof(r2d::pkrect_t));
+            if (N != NULL)   p->Nodes = N;
+            if (R != NULL)   p->Rects = R;
+            if (N != NULL && R != NULL) p->Capacity = nc;
+            else return NULL;
+        }
+
+        size_t index_a =(p->Count * 3) + 1;
+        size_t index_b =(p->Count * 3) + 2;
+        node->Child[0] = index_a;
+        node->Child[1] = index_b;
+        p->Nodes[index_a] = a;
+        p->Nodes[index_b] = b;
+        return node_insert(p, node->Child[0], w, h);
+    }
+}
 
 /*///////////////////////
 //  Public Functions   //
@@ -430,3 +529,168 @@ bool r2d::dxgi_format_to_gl(uint32_t dxgi, GLenum *out_internalformat, GLenum *o
     }
     return false;
 }
+
+bool r2d::create_packer(r2d::packer_t *packer, size_t width, size_t height, size_t capacity)
+{
+    if (packer != NULL)
+    {
+        if (capacity == 0) capacity = 1; // need at least one node for the root.
+        packer->Width    = width;
+        packer->Height   = height;
+        packer->Free     = width * height;
+        packer->Used     = 0;
+        packer->Capacity = capacity;
+        packer->Count    = 0;
+        packer->Nodes    = NULL;
+        packer->Rects    = NULL;
+
+        r2d::pknode_t    root;
+        packer->Nodes    = (r2d::pknode_t*) malloc(capacity * sizeof(r2d::pknode_t) * 3);
+        packer->Rects    = (r2d::pkrect_t*) malloc(capacity * sizeof(r2d::pkrect_t));
+        root.Flags       = r2d::PACKER_FLAGS_NONE;
+        root.Index       = 0xFFFFFFFFU;
+        root.Child[0]    = 0;
+        root.Child[1]    = 0;
+        root.Bound[0]    = 0;
+        root.Bound[1]    = 0;
+        root.Bound[2]    = uint32_t(width);
+        root.Bound[3]    = uint32_t(height);
+        packer->Nodes[0] = root;
+        return true;
+    }
+    else return false;
+}
+
+void r2d::delete_packer(r2d::packer_t *packer)
+{
+    if (packer != NULL)
+    {
+        if (packer->Rects != NULL) free(packer->Rects);
+        if (packer->Nodes != NULL) free(packer->Nodes);
+        packer->Width      = 0;
+        packer->Height     = 0;
+        packer->Free       = 0;
+        packer->Used       = 0;
+        packer->Capacity   = 0;
+        packer->Count      = 0;
+        packer->Nodes      = NULL;
+        packer->Rects      = NULL;
+    }
+}
+
+void r2d::reset_packer(r2d::packer_t *packer)
+{
+    if (packer->Capacity > 0)
+    {
+        r2d::pknode_t root;
+        root.Flags    = r2d::PACKER_FLAGS_NONE;
+        root.Index    = 0xFFFFFFFFU;
+        root.Child[0] = 0;
+        root.Child[1] = 0;
+        root.Bound[0] = 0;
+        root.Bound[1] = 0;
+        root.Bound[2] = uint32_t(packer->Width);
+        root.Bound[3] = uint32_t(packer->Height);
+        packer->Count = 0;
+        packer->Nodes[0] = root;
+    }
+    packer->Free  = packer->Width * packer->Height;
+    packer->Used  = 0;
+}
+
+bool r2d::packer_insert(r2d::packer_t *packer, size_t width, size_t height, size_t hpad, size_t vpad, uint32_t id, r2d::pkrect_t *rect)
+{
+    size_t w = width  + (hpad * 2);
+    size_t h = height + (vpad * 2);
+    size_t a = w * h;
+
+    // if there isn't enough space available, don't
+    // bother searching for a place to put this rectangle.
+    if (a > packer->Free)
+        return false;
+
+    r2d::pknode_t *n  = node_insert(packer, 0, w, h);
+    if (n != NULL)
+    {
+        r2d::pkrect_t r;
+        r.X        = n->Bound[0] + hpad;
+        r.Y        = n->Bound[1] + vpad;
+        r.Width    = width;
+        r.Height   = height;
+        r.Content  = id;
+        r.Flags    = n->Flags;
+        if (rect) *rect = r;
+
+        n->Flags  |= r2d::PACKER_FLAGS_USED;
+        n->Index   = uint32_t(packer->Count);
+        packer->Rects[packer->Count++] = r;
+        packer->Free -= a;
+        packer->Used += a;
+        return true;
+    }
+    else return false;
+}
+
+bool r2d::create_atlas_entry(r2d::atlas_entry_t *ent, uint32_t name, size_t frame_count)
+{
+    if (ent != NULL)
+    {
+        if (frame_count == 0) frame_count = 1;
+        ent->Name        = name;
+        ent->Flags       = r2d::ATLAS_ENTRY_NORMAL;
+        ent->FrameCount  = frame_count;
+        ent->MaxWidth    = 0;
+        ent->MaxHeight   = 0;
+        ent->Page0       = 0;
+        ent->Frame0      = { 
+            0, 0, 0, 0
+        };
+        if (frame_count == 1)
+        {   // this is the typical case - only one frame.
+            // don't allocate additional storage, use the pre-allocated stuff.
+            ent->PageIds = &ent->Page0;
+            ent->Frames  = &ent->Frame0;
+        }
+        else
+        {   // multi-frame entries allocate separate array storage.
+            ent->Flags  |= r2d::ATLAS_ENTRY_MULTIFRAME;
+            ent->PageIds = (size_t*)            malloc(frame_count * sizeof(size_t));
+            ent->Frames  = (r2d::atlas_frame_t*)malloc(frame_count * sizeof(r2d::atlas_frame_t)); 
+        }
+        return true;
+    }
+    else return false;
+}
+
+void r2d::delete_atlas_entry(r2d::atlas_entry_t *ent)
+{
+    if (ent != NULL)
+    {
+        if (ent->Flags & r2d::ATLAS_ENTRY_MULTIFRAME)
+        {
+            if (ent->Frames  != NULL) free(ent->Frames);
+            if (ent->PageIds != NULL) free(ent->PageIds);
+        }
+        ent->FrameCount = 0;
+        ent->PageIds    = NULL;
+        ent->Frames     = NULL;
+    }
+}
+
+void r2d::set_atlas_entry_frame(r2d::atlas_entry_t *ent, size_t frame_index, size_t page_id, r2d::atlas_frame_t const &frame)
+{
+    assert(frame_index < ent->FrameCount);
+
+    if (frame.Width  > ent->MaxWidth)
+        ent->MaxWidth  = frame.Width;
+
+    if (frame.Height > ent->MaxHeight)
+        ent->MaxHeight = frame.Height;
+    
+    if (frame_index > 0 && ent->PageIds[frame_index] != page_id)
+        ent->Flags    |= r2d::ATLAS_ENTRY_MULTIPAGE;
+
+    ent->PageIds[frame_index] = page_id;
+    ent->Frames [frame_index] = frame;
+}
+
