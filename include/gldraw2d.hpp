@@ -71,7 +71,7 @@ enum packer_flags_e
 /// @summary Flags used with a texture atlas entry.
 enum atlas_entry_flags_e
 {
-    ATLAS_ENTRY_NORMAL     =  0, 
+    ATLAS_ENTRY_NORMAL     =  0,
     ATLAS_ENTRY_MULTIFRAME = (1 << 0),
     ATLAS_ENTRY_MULTIPAGE  = (1 << 1)
 };
@@ -80,62 +80,80 @@ enum atlas_entry_flags_e
 /// rectangles within a single, larger master rectangle.
 struct pknode_t
 {
-    uint32_t            Flags;      /// Combination of packer_flags_e.
-    uint32_t            Index;      /// Index of the associated pkrect_t.
-    uint32_t            Child[2];   /// Index of the child nodes, 0 if no child.
-    uint32_t            Bound[4];   /// Left-Top-Right-Bottom bounding rectangle.
+    uint32_t            Flags;         /// Combination of packer_flags_e.
+    uint32_t            Index;         /// Index of the associated pkrect_t.
+    uint32_t            Child[2];      /// Index of the child nodes, 0 if no child.
+    uint32_t            Bound[4];      /// Left-Top-Right-Bottom bounding rectangle.
 };
 
 /// @summary Represents a single sub-rectangle within a larger image. This
 /// data is stored separately from nodes for more cache-friendly behavior.
 struct pkrect_t
 {
-    size_t              X;          /// X-coordinate of upper-left corner of the content.
-    size_t              Y;          /// Y-coordinate of upper-left corner of the content.
-    size_t              Width;      /// Width of the rectangle content.
-    size_t              Height;     /// Height of the rectangle content.
-    uint32_t            Content;    /// Application-defined content identifier.
-    uint32_t            Flags;      /// Flag bits, copied from the node.
+    size_t              X;             /// X-coordinate of upper-left corner of the content.
+    size_t              Y;             /// Y-coordinate of upper-left corner of the content.
+    size_t              Width;         /// Width of the rectangle content.
+    size_t              Height;        /// Height of the rectangle content.
+    uint32_t            Content;       /// Application-defined content identifier.
+    uint32_t            Flags;         /// Flag bits, copied from the node.
 };
 
 /// @summary Stores the data necessary for maintaining the set of sub-rectangles
 /// packed together within a single larger master rectangle.
 struct packer_t
 {
-    size_t              Width;      /// Width of primary image, in pixels.
-    size_t              Height;     /// Height of primary image, in pixels.
-    size_t              Free;       /// Total area currently unused.
-    size_t              Used;       /// Total area currently used.
-    size_t              Capacity;   /// The capacity of the node and rectangle storage.
-    size_t              Count;      /// The number of sub-rectangles currently defined.
-    r2d::pknode_t      *Nodes;      /// Storage for node instances.
-    r2d::pkrect_t      *Rects;      /// Storage for rectangle data.
+    size_t              Width;         /// Width of primary image, in pixels.
+    size_t              Height;        /// Height of primary image, in pixels.
+    size_t              Free;          /// Total area currently unused.
+    size_t              Used;          /// Total area currently used.
+    size_t              Capacity;      /// The capacity of the node and rectangle storage.
+    size_t              Count;         /// The number of sub-rectangles currently defined.
+    r2d::pknode_t      *Nodes;         /// Storage for node instances.
+    r2d::pkrect_t      *Rects;         /// Storage for rectangle data.
 };
 
-/// @summary Describes a single frame within a logical texture atlas entry. Items in 
+/// @summary Describes a single frame within a logical texture atlas entry. Items in
 /// the texture atlas may be animations, in which case multiple frames are present
 /// on the same logical entry.
 struct atlas_frame_t
 {
-    size_t              X;          /// The upper-left corner of the frame on the texture.
-    size_t              Y;          /// The upper-left corner of the frame on the texture.
-    size_t              Width;      /// The frame width, in pixels.
-    size_t              Height;     /// The frame height, in pixels.
+    size_t              X;             /// The upper-left corner of the frame on the texture.
+    size_t              Y;             /// The upper-left corner of the frame on the texture.
+    size_t              Width;         /// The frame width, in pixels.
+    size_t              Height;        /// The frame height, in pixels.
 };
 
-/// @summary Represents a single logical entry in a texture atlas. The entry 
+/// @summary Represents a single logical entry in a texture atlas. The entry
 /// may have several frames (if it is an animation, for example.)
 struct atlas_entry_t
 {
-    uint32_t            Name;       /// The hash of the name of the entry.
-    uint32_t            Flags;      /// Combination of atlas_entry_flags_e.
-    size_t              FrameCount; /// The number of frames in the entry.
-    size_t              MaxWidth;   /// The maximum width of any frame, in pixels.
-    size_t              MaxHeight;  /// The maximum height of any frame, in pixels.
-    size_t             *PageIds;    /// An array of FrameCount page indices or IDs.
-    size_t              Page0;      /// The ID or index of the page for the first frame.
-    r2d::atlas_frame_t *Frames;     /// An array of FrameCount frame descriptions.
-    r2d::atlas_frame_t  Frame0;     /// Statically allocated storage for the first frame.
+    uint32_t            Name;          /// The hash of the name of the entry.
+    uint32_t            Flags;         /// Combination of atlas_entry_flags_e.
+    size_t              FrameCount;    /// The number of frames in the entry.
+    size_t              MaxWidth;      /// The maximum width of any frame, in pixels.
+    size_t              MaxHeight;     /// The maximum height of any frame, in pixels.
+    size_t             *PageIds;       /// An array of FrameCount page indices or IDs.
+    size_t              Page0;         /// The ID or index of the page for the first frame.
+    r2d::atlas_frame_t *Frames;        /// An array of FrameCount frame descriptions.
+    r2d::atlas_frame_t  Frame0;        /// Statically allocated storage for the first frame.
+};
+
+/// @summary Dynamically builds texture atlases (without mipmaps) for 2D content
+/// such as GUIs and sprites. Each texture object is referred to as a page.
+/// Updates are streamed to the texture object using a pixel buffer object.
+struct image_cache_t
+{
+    size_t              PageWidth;     /// The width of a texture page, in pixels.
+    size_t              PageHeight;    /// The height of a texture page, in pixels.
+    size_t              HorizontalPad; /// The horizontal padding between sub-images, in pixels.
+    size_t              VerticalPad;   /// The vertical padding between sub-images, in pixels.
+    size_t              EntryCapacity; /// The number of entries that can be stored.
+    size_t              EntryCount;    /// The number of entries currently valid.
+    r2d::atlas_entry_t *PageEntries;   /// The set of entries across all pages.
+    GLuint             *TexturePages;  /// The set of OpenGL texture object IDs.
+    size_t              BucketCount;   /// The number of buckets defined in the name->index table.
+    uint32_t          **EntryNames;    /// A table mapping entry name->index in PageEntries.
+    GLuint              TransferBuffer;/// The OpenGL pixel buffer object ID.
 };
 
 /*/////////////////
