@@ -702,7 +702,7 @@ static void print_header(FILE *fp, data::dds_header_t const *head)
     fprintf(fp, "  Caps:        ");
     for (size_t i = 0, n = 0; i < DDSCAPS_COUNT; ++i)
     {
-        if ((n == 0 && head->Caps == data::DDSCAPS_NONE) || (head->Flags & DDSCAPS_FLAGS[i]))
+        if ((n == 0 && head->Caps == data::DDSCAPS_NONE) || (head->Caps & DDSCAPS_FLAGS[i]))
         {
             if ((n != 0))
                 fprintf(fp, " | ");
@@ -714,7 +714,7 @@ static void print_header(FILE *fp, data::dds_header_t const *head)
     fprintf(fp, "  Caps2:       ");
     for (size_t i = 0, n = 0; i < DDSCAPS2_COUNT; ++i)
     {
-        if ((n == 0 && head->Caps2 == data::DDSCAPS2_NONE) || (head->Flags & DDSCAPS2_FLAGS[i]))
+        if ((n == 0 && head->Caps2 == data::DDSCAPS2_NONE) || (head->Caps2 & DDSCAPS2_FLAGS[i]))
         {
             if ((n != 0))
                 fprintf(fp, " | ");
@@ -726,7 +726,7 @@ static void print_header(FILE *fp, data::dds_header_t const *head)
     fprintf(fp, "  Caps3:       ");
     for (size_t i = 0, n = 0; i < DDSCAPS3_COUNT; ++i)
     {
-        if ((n == 0 && head->Caps3 == data::DDSCAPS3_NONE) || (head->Flags & DDSCAPS3_FLAGS[i]))
+        if ((n == 0 && head->Caps3 == data::DDSCAPS3_NONE) || (head->Caps2 & DDSCAPS3_FLAGS[i]))
         {
             if ((n != 0))
                 fprintf(fp, " | ");
@@ -738,7 +738,7 @@ static void print_header(FILE *fp, data::dds_header_t const *head)
     fprintf(fp, "  Caps4:       ");
     for (size_t i = 0, n = 0; i < DDSCAPS4_COUNT; ++i)
     {
-        if ((n == 0 && head->Caps4 == data::DDSCAPS4_NONE) || (head->Flags & DDSCAPS4_FLAGS[i]))
+        if ((n == 0 && head->Caps4 == data::DDSCAPS4_NONE) || (head->Caps2 & DDSCAPS4_FLAGS[i]))
         {
             if ((n != 0))
                 fprintf(fp, " | ");
