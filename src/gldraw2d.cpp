@@ -14,7 +14,20 @@
 /*/////////////////
 //   Constants   //
 /////////////////*/
-#define SETP(x, v)  if ((x) != NULL) *(x) = (v)
+/// @summary The desired number of uint32_t names per-bucket.
+static size_t const IMAGE_CACHE_NAMES_PER_BUCKET = 16;
+
+/// @summary The default capacity of an image cache, in images.
+static size_t const IMAGE_CACHE_DEFAULT_CAPACITY = 1024;
+
+/// @summary The zero-based index of the first name within a bucket.
+static size_t const IMAGE_CACHE_FIRST_NAME       = 2;
+
+/// @summary Define the minimum number of name buckets allocated per-image cache.
+static size_t const IMAGE_CACHE_MIN_BUCKET_COUNT = IMAGE_CACHE_DEFAULT_CAPACITY / IMAGE_CACHE_NAMES_PER_BUCKET;
+
+/// @summary Define the default capacity of the TexturePages texture ID storage.
+static size_t const IMAGE_CACHE_PAGE_CAPACITY    = 4;
 
 /*///////////////
 //   Globals   //
@@ -33,7 +46,7 @@
 /// @param n The zero-based index of the node at which the insertion is being attempted.
 /// @param w The width of the rectangle being inserted.
 /// @param h The height of the rectangle being inserted.
-/// @return The node at which the rectangle should be inserted, or NULL if the 
+/// @return The node at which the rectangle should be inserted, or NULL if the
 /// rectangle cannot fit within the remaining area of the master rectangle.
 static r2d::pknode_t* node_insert(r2d::packer_t *p, uint32_t n, size_t w, size_t h)
 {
@@ -126,7 +139,7 @@ static r2d::pknode_t* node_insert(r2d::packer_t *p, uint32_t n, size_t w, size_t
 /*///////////////////////
 //  Public Functions   //
 ///////////////////////*/
-bool r2d::dxgi_format_to_gl(uint32_t dxgi, GLenum *out_internalformat, GLenum *out_format, GLenum *out_datatype)
+bool r2d::dxgi_format_to_gl(uint32_t dxgi, GLenum &out_internalformat, GLenum &out_format, GLenum &out_datatype)
 {
     switch (dxgi)
     {
@@ -178,351 +191,351 @@ bool r2d::dxgi_format_to_gl(uint32_t dxgi, GLenum *out_internalformat, GLenum *o
         case data::DXGI_FORMAT_IA44:
             break;
         case data::DXGI_FORMAT_R32G32B32A32_FLOAT:
-            SETP(out_internalformat, GL_RGBA32F);
-            SETP(out_format        , GL_BGRA);
-            SETP(out_datatype      , GL_FLOAT);
+            out_internalformat = GL_RGBA32F;
+            out_format         = GL_BGRA;
+            out_datatype       = GL_FLOAT;
             return true;
         case data::DXGI_FORMAT_R32G32B32A32_UINT:
-            SETP(out_internalformat, GL_RGBA32UI);
-            SETP(out_format        , GL_BGRA_INTEGER);
-            SETP(out_datatype      , GL_UNSIGNED_INT);
+            out_internalformat = GL_RGBA32UI;
+            out_format         = GL_BGRA_INTEGER;
+            out_datatype       = GL_UNSIGNED_INT;
             return true;
         case data::DXGI_FORMAT_R32G32B32A32_SINT:
-            SETP(out_internalformat, GL_RGBA32I);
-            SETP(out_format        , GL_BGRA_INTEGER);
-            SETP(out_datatype      , GL_INT);
+            out_internalformat = GL_RGBA32I;
+            out_format         = GL_BGRA_INTEGER;
+            out_datatype       = GL_INT;
             return true;
         case data::DXGI_FORMAT_R32G32B32_FLOAT:
-            SETP(out_internalformat, GL_RGB32F);
-            SETP(out_format        , GL_BGR);
-            SETP(out_datatype      , GL_FLOAT);
+            out_internalformat = GL_RGB32F;
+            out_format         = GL_BGR;
+            out_datatype       = GL_FLOAT;
             return true;
         case data::DXGI_FORMAT_R32G32B32_UINT:
-            SETP(out_internalformat, GL_RGB32UI);
-            SETP(out_format        , GL_BGR_INTEGER);
-            SETP(out_datatype      , GL_UNSIGNED_INT);
+            out_internalformat = GL_RGB32UI;
+            out_format         = GL_BGR_INTEGER;
+            out_datatype       = GL_UNSIGNED_INT;
             return true;
         case data::DXGI_FORMAT_R32G32B32_SINT:
-            SETP(out_internalformat, GL_RGB32I);
-            SETP(out_format        , GL_BGR_INTEGER);
-            SETP(out_datatype      , GL_INT);
+            out_internalformat = GL_RGB32I;
+            out_format         = GL_BGR_INTEGER;
+            out_datatype       = GL_INT;
             return true;
         case data::DXGI_FORMAT_R16G16B16A16_FLOAT:
-            SETP(out_internalformat, GL_RGBA16F);
-            SETP(out_format        , GL_BGRA);
-            SETP(out_datatype      , GL_HALF_FLOAT);
+            out_internalformat = GL_RGBA16F;
+            out_format         = GL_BGRA;
+            out_datatype       = GL_HALF_FLOAT;
             return true;
         case data::DXGI_FORMAT_R16G16B16A16_UNORM:
-            SETP(out_internalformat, GL_RGBA16);
-            SETP(out_format        , GL_BGRA_INTEGER);
-            SETP(out_datatype      , GL_UNSIGNED_SHORT);
+            out_internalformat = GL_RGBA16;
+            out_format         = GL_BGRA_INTEGER;
+            out_datatype       = GL_UNSIGNED_SHORT;
             return true;
         case data::DXGI_FORMAT_R16G16B16A16_UINT:
-            SETP(out_internalformat, GL_RGBA16UI);
-            SETP(out_format        , GL_BGRA_INTEGER);
-            SETP(out_datatype      , GL_UNSIGNED_SHORT);
+            out_internalformat = GL_RGBA16UI;
+            out_format         = GL_BGRA_INTEGER;
+            out_datatype       = GL_UNSIGNED_SHORT;
             return true;
         case data::DXGI_FORMAT_R16G16B16A16_SNORM:
-            SETP(out_internalformat, GL_RGBA16_SNORM);
-            SETP(out_format        , GL_BGRA_INTEGER);
-            SETP(out_datatype      , GL_SHORT);
+            out_internalformat = GL_RGBA16_SNORM;
+            out_format         = GL_BGRA_INTEGER;
+            out_datatype       = GL_SHORT;
             return true;
         case data::DXGI_FORMAT_R16G16B16A16_SINT:
-            SETP(out_internalformat, GL_RGBA16I);
-            SETP(out_format        , GL_BGRA_INTEGER);
-            SETP(out_datatype      , GL_SHORT);
+            out_internalformat = GL_RGBA16I;
+            out_format         = GL_BGRA_INTEGER;
+            out_datatype       = GL_SHORT;
             return true;
         case data::DXGI_FORMAT_R32G32_FLOAT:
-            SETP(out_internalformat, GL_RG32F);
-            SETP(out_format        , GL_RG);
-            SETP(out_datatype      , GL_FLOAT);
+            out_internalformat = GL_RG32F;
+            out_format         = GL_RG;
+            out_datatype       = GL_FLOAT;
             return true;
         case data::DXGI_FORMAT_R32G32_UINT:
-            SETP(out_internalformat, GL_RG32UI);
-            SETP(out_format        , GL_RG);
-            SETP(out_datatype      , GL_UNSIGNED_INT);
+            out_internalformat = GL_RG32UI;
+            out_format         = GL_RG;
+            out_datatype       = GL_UNSIGNED_INT;
             return true;
         case data::DXGI_FORMAT_R32G32_SINT:
-            SETP(out_internalformat, GL_RG32I);
-            SETP(out_format        , GL_RG);
-            SETP(out_datatype      , GL_INT);
+            out_internalformat = GL_RG32I;
+            out_format         = GL_RG;
+            out_datatype       = GL_INT;
             return true;
         case data::DXGI_FORMAT_D32_FLOAT_S8X24_UINT:
-            SETP(out_internalformat, GL_DEPTH_STENCIL);
-            SETP(out_format        , GL_DEPTH_STENCIL);
-            SETP(out_datatype      , GL_FLOAT); // ???
+            out_internalformat = GL_DEPTH_STENCIL;
+            out_format         = GL_DEPTH_STENCIL;
+            out_datatype       = GL_FLOAT; // ???
             return true;
         case data::DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS:
-            SETP(out_internalformat, GL_RG32F);
-            SETP(out_format        , GL_RG);
-            SETP(out_datatype      , GL_FLOAT);
+            out_internalformat = GL_RG32F;
+            out_format         = GL_RG;
+            out_datatype       = GL_FLOAT;
             return true;
         case data::DXGI_FORMAT_X32_TYPELESS_G8X24_UINT:
             return true;
         case data::DXGI_FORMAT_R10G10B10A2_UNORM:
-            SETP(out_internalformat, GL_RGB10_A2);
-            SETP(out_format        , GL_BGRA);
-            SETP(out_datatype      , GL_UNSIGNED_INT_2_10_10_10_REV);
+            out_internalformat = GL_RGB10_A2;
+            out_format         = GL_BGRA;
+            out_datatype       = GL_UNSIGNED_INT_2_10_10_10_REV;
             return true;
         case data::DXGI_FORMAT_R10G10B10A2_UINT:
-            SETP(out_internalformat, GL_RGB10_A2UI);
-            SETP(out_format        , GL_BGRA);
-            SETP(out_datatype      , GL_UNSIGNED_INT_2_10_10_10_REV);
+            out_internalformat = GL_RGB10_A2UI;
+            out_format         = GL_BGRA;
+            out_datatype       = GL_UNSIGNED_INT_2_10_10_10_REV;
             return true;
         case data::DXGI_FORMAT_R11G11B10_FLOAT:
-            SETP(out_internalformat, GL_R11F_G11F_B10F);
-            SETP(out_format        , GL_BGR);
-            SETP(out_datatype      , GL_FLOAT); // ???
+            out_internalformat = GL_R11F_G11F_B10F;
+            out_format         = GL_BGR;
+            out_datatype       = GL_FLOAT; // ???
             return true;
         case data::DXGI_FORMAT_R8G8B8A8_UNORM:
-            SETP(out_internalformat, GL_RGBA8);
-            SETP(out_format        , GL_BGRA);
-            SETP(out_datatype      , GL_UNSIGNED_INT_8_8_8_8_REV);
+            out_internalformat = GL_RGBA8;
+            out_format         = GL_BGRA;
+            out_datatype       = GL_UNSIGNED_INT_8_8_8_8_REV;
             return true;
         case data::DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
-            SETP(out_internalformat, GL_SRGB8_ALPHA8);
-            SETP(out_format        , GL_BGRA);
-            SETP(out_datatype      , GL_UNSIGNED_INT_8_8_8_8_REV);
+            out_internalformat = GL_SRGB8_ALPHA8;
+            out_format         = GL_BGRA;
+            out_datatype       = GL_UNSIGNED_INT_8_8_8_8_REV;
             return true;
         case data::DXGI_FORMAT_R8G8B8A8_UINT:
-            SETP(out_internalformat, GL_RGBA8UI);
-            SETP(out_format        , GL_BGRA);
-            SETP(out_datatype      , GL_UNSIGNED_INT_8_8_8_8_REV);
+            out_internalformat = GL_RGBA8UI;
+            out_format         = GL_BGRA;
+            out_datatype       = GL_UNSIGNED_INT_8_8_8_8_REV;
             return true;
         case data::DXGI_FORMAT_R8G8B8A8_SNORM:
-            SETP(out_internalformat, GL_RGBA8_SNORM);
-            SETP(out_format        , GL_BGRA);
-            SETP(out_datatype      , GL_UNSIGNED_INT_8_8_8_8_REV);
+            out_internalformat = GL_RGBA8_SNORM;
+            out_format         = GL_BGRA;
+            out_datatype       = GL_UNSIGNED_INT_8_8_8_8_REV;
             return true;
         case data::DXGI_FORMAT_R8G8B8A8_SINT:
-            SETP(out_internalformat, GL_RGBA8I);
-            SETP(out_format        , GL_BGRA);
-            SETP(out_datatype      , GL_BYTE);
+            out_internalformat = GL_RGBA8I;
+            out_format         = GL_BGRA;
+            out_datatype       = GL_BYTE;
             return true;
         case data::DXGI_FORMAT_R16G16_FLOAT:
-            SETP(out_internalformat, GL_RG16F);
-            SETP(out_format        , GL_RG);
-            SETP(out_datatype      , GL_HALF_FLOAT);
+            out_internalformat = GL_RG16F;
+            out_format         = GL_RG;
+            out_datatype       = GL_HALF_FLOAT;
             return true;
         case data::DXGI_FORMAT_R16G16_UNORM:
-            SETP(out_internalformat, GL_RG16);
-            SETP(out_format        , GL_RG);
-            SETP(out_datatype      , GL_UNSIGNED_SHORT);
+            out_internalformat = GL_RG16;
+            out_format         = GL_RG;
+            out_datatype       = GL_UNSIGNED_SHORT;
             return true;
         case data::DXGI_FORMAT_R16G16_UINT:
-            SETP(out_internalformat, GL_RG16UI);
-            SETP(out_format        , GL_RG);
-            SETP(out_datatype      , GL_UNSIGNED_SHORT);
+            out_internalformat = GL_RG16UI;
+            out_format         = GL_RG;
+            out_datatype       = GL_UNSIGNED_SHORT;
             return true;
         case data::DXGI_FORMAT_R16G16_SNORM:
-            SETP(out_internalformat, GL_RG16_SNORM);
-            SETP(out_format        , GL_RG);
-            SETP(out_datatype      , GL_SHORT);
+            out_internalformat = GL_RG16_SNORM;
+            out_format         = GL_RG;
+            out_datatype       = GL_SHORT;
             return true;
         case data::DXGI_FORMAT_R16G16_SINT:
-            SETP(out_internalformat, GL_RG16I);
-            SETP(out_format        , GL_RG);
-            SETP(out_datatype      , GL_SHORT);
+            out_internalformat = GL_RG16I;
+            out_format         = GL_RG;
+            out_datatype       = GL_SHORT;
             return true;
         case data::DXGI_FORMAT_D32_FLOAT:
-            SETP(out_internalformat, GL_DEPTH_COMPONENT);
-            SETP(out_format        , GL_DEPTH_COMPONENT);
-            SETP(out_datatype      , GL_FLOAT);
+            out_internalformat = GL_DEPTH_COMPONENT;
+            out_format         = GL_DEPTH_COMPONENT;
+            out_datatype       = GL_FLOAT;
             return true;
         case data::DXGI_FORMAT_R32_FLOAT:
-            SETP(out_internalformat, GL_R32F);
-            SETP(out_format        , GL_RED);
-            SETP(out_datatype      , GL_FLOAT);
+            out_internalformat = GL_R32F;
+            out_format         = GL_RED;
+            out_datatype       = GL_FLOAT;
             return true;
         case data::DXGI_FORMAT_R32_UINT:
-            SETP(out_internalformat, GL_R32UI);
-            SETP(out_format        , GL_RED);
-            SETP(out_datatype      , GL_UNSIGNED_INT);
+            out_internalformat = GL_R32UI;
+            out_format         = GL_RED;
+            out_datatype       = GL_UNSIGNED_INT;
             return true;
         case data::DXGI_FORMAT_R32_SINT:
-            SETP(out_internalformat, GL_R32I);
-            SETP(out_format        , GL_RED);
-            SETP(out_datatype      , GL_INT);
+            out_internalformat = GL_R32I;
+            out_format         = GL_RED;
+            out_datatype       = GL_INT;
             return true;
         case data::DXGI_FORMAT_D24_UNORM_S8_UINT:
-            SETP(out_internalformat, GL_DEPTH_STENCIL);
-            SETP(out_format        , GL_DEPTH_STENCIL);
-            SETP(out_datatype      , GL_UNSIGNED_INT);
+            out_internalformat = GL_DEPTH_STENCIL;
+            out_format         = GL_DEPTH_STENCIL;
+            out_datatype       = GL_UNSIGNED_INT;
             return true;
         case data::DXGI_FORMAT_R8G8_UNORM:
-            SETP(out_internalformat, GL_RG8);
-            SETP(out_format        , GL_RG);
-            SETP(out_datatype      , GL_UNSIGNED_BYTE);
+            out_internalformat = GL_RG8;
+            out_format         = GL_RG;
+            out_datatype       = GL_UNSIGNED_BYTE;
             return true;
         case data::DXGI_FORMAT_R8G8_UINT:
-            SETP(out_internalformat, GL_RG8UI);
-            SETP(out_format        , GL_RG);
-            SETP(out_datatype      , GL_UNSIGNED_BYTE);
+            out_internalformat = GL_RG8UI;
+            out_format         = GL_RG;
+            out_datatype       = GL_UNSIGNED_BYTE;
             return true;
         case data::DXGI_FORMAT_R8G8_SNORM:
-            SETP(out_internalformat, GL_RG8_SNORM);
-            SETP(out_format        , GL_RG);
-            SETP(out_datatype      , GL_BYTE);
+            out_internalformat = GL_RG8_SNORM;
+            out_format         = GL_RG;
+            out_datatype       = GL_BYTE;
             return true;
         case data::DXGI_FORMAT_R8G8_SINT:
-            SETP(out_internalformat, GL_RG8I);
-            SETP(out_format        , GL_RG);
-            SETP(out_datatype      , GL_BYTE);
+            out_internalformat = GL_RG8I;
+            out_format         = GL_RG;
+            out_datatype       = GL_BYTE;
             return true;
         case data::DXGI_FORMAT_R16_FLOAT:
-            SETP(out_internalformat, GL_R16F);
-            SETP(out_format        , GL_RED);
-            SETP(out_datatype      , GL_HALF_FLOAT);
+            out_internalformat = GL_R16F;
+            out_format         = GL_RED;
+            out_datatype       = GL_HALF_FLOAT;
             return true;
         case data::DXGI_FORMAT_D16_UNORM:
-            SETP(out_internalformat, GL_DEPTH_COMPONENT);
-            SETP(out_format        , GL_DEPTH_COMPONENT);
-            SETP(out_datatype      , GL_UNSIGNED_SHORT);
+            out_internalformat = GL_DEPTH_COMPONENT;
+            out_format         = GL_DEPTH_COMPONENT;
+            out_datatype       = GL_UNSIGNED_SHORT;
             return true;
         case data::DXGI_FORMAT_R16_UNORM:
-            SETP(out_internalformat, GL_R16);
-            SETP(out_format        , GL_RED);
-            SETP(out_datatype      , GL_UNSIGNED_SHORT);
+            out_internalformat = GL_R16;
+            out_format         = GL_RED;
+            out_datatype       = GL_UNSIGNED_SHORT;
             return true;
         case data::DXGI_FORMAT_R16_UINT:
-            SETP(out_internalformat, GL_R16UI);
-            SETP(out_format        , GL_RED);
-            SETP(out_datatype      , GL_UNSIGNED_SHORT);
+            out_internalformat = GL_R16UI;
+            out_format         = GL_RED;
+            out_datatype       = GL_UNSIGNED_SHORT;
             return true;
         case data::DXGI_FORMAT_R16_SNORM:
-            SETP(out_internalformat, GL_R16_SNORM);
-            SETP(out_format        , GL_RED);
-            SETP(out_datatype      , GL_SHORT);
+            out_internalformat = GL_R16_SNORM;
+            out_format         = GL_RED;
+            out_datatype       = GL_SHORT;
             return true;
         case data::DXGI_FORMAT_R16_SINT:
-            SETP(out_internalformat, GL_R16I);
-            SETP(out_format        , GL_RED);
-            SETP(out_datatype      , GL_SHORT);
+            out_internalformat = GL_R16I;
+            out_format         = GL_RED;
+            out_datatype       = GL_SHORT;
             return true;
         case data::DXGI_FORMAT_R8_UNORM:
-            SETP(out_internalformat, GL_R8);
-            SETP(out_format        , GL_RED);
-            SETP(out_datatype      , GL_UNSIGNED_BYTE);
+            out_internalformat = GL_R8;
+            out_format         = GL_RED;
+            out_datatype       = GL_UNSIGNED_BYTE;
             return true;
         case data::DXGI_FORMAT_R8_UINT:
-            SETP(out_internalformat, GL_R8UI);
-            SETP(out_format        , GL_RED);
-            SETP(out_datatype      , GL_UNSIGNED_BYTE);
+            out_internalformat = GL_R8UI;
+            out_format         = GL_RED;
+            out_datatype       = GL_UNSIGNED_BYTE;
             return true;
         case data::DXGI_FORMAT_R8_SNORM:
-            SETP(out_internalformat, GL_R8_SNORM);
-            SETP(out_format        , GL_RED);
-            SETP(out_datatype      , GL_BYTE);
+            out_internalformat = GL_R8_SNORM;
+            out_format         = GL_RED;
+            out_datatype       = GL_BYTE;
             return true;
         case data::DXGI_FORMAT_R8_SINT:
-            SETP(out_internalformat, GL_R8I);
-            SETP(out_format        , GL_RED);
-            SETP(out_datatype      , GL_BYTE);
+            out_internalformat = GL_R8I;
+            out_format         = GL_RED;
+            out_datatype       = GL_BYTE;
             return true;
         case data::DXGI_FORMAT_A8_UNORM:
-            SETP(out_internalformat, GL_R8);
-            SETP(out_format        , GL_RED);
-            SETP(out_datatype      , GL_UNSIGNED_BYTE);
+            out_internalformat = GL_R8;
+            out_format         = GL_RED;
+            out_datatype       = GL_UNSIGNED_BYTE;
             return true;
         case data::DXGI_FORMAT_R9G9B9E5_SHAREDEXP:
-            SETP(out_internalformat, GL_RGB9_E5);
-            SETP(out_format        , GL_RGB);
-            SETP(out_datatype      , GL_UNSIGNED_INT);
+            out_internalformat = GL_RGB9_E5;
+            out_format         = GL_RGB;
+            out_datatype       = GL_UNSIGNED_INT;
             return true;
         case data::DXGI_FORMAT_BC1_UNORM:
-            SETP(out_internalformat, GL_COMPRESSED_RGBA_S3TC_DXT1_EXT);
-            SETP(out_format        , GL_RGBA);
-            SETP(out_datatype      , GL_UNSIGNED_BYTE);
+            out_internalformat = GL_COMPRESSED_RGBA_S3TC_DXT1_EXT;
+            out_format         = GL_RGBA;
+            out_datatype       = GL_UNSIGNED_BYTE;
             return true;
         case data::DXGI_FORMAT_BC1_UNORM_SRGB:
-            SETP(out_internalformat, 0x8C4D);
-            SETP(out_format        , GL_RGBA);
-            SETP(out_datatype      , GL_UNSIGNED_BYTE);
+            out_internalformat = 0x8C4D;
+            out_format         = GL_RGBA;
+            out_datatype       = GL_UNSIGNED_BYTE;
             return true;
         case data::DXGI_FORMAT_BC3_UNORM:
-            SETP(out_internalformat, GL_COMPRESSED_RGBA_S3TC_DXT3_EXT);
-            SETP(out_format        , GL_RGBA);
-            SETP(out_datatype      , GL_UNSIGNED_BYTE);
+            out_internalformat = GL_COMPRESSED_RGBA_S3TC_DXT3_EXT;
+            out_format         = GL_RGBA;
+            out_datatype       = GL_UNSIGNED_BYTE;
             return true;
         case data::DXGI_FORMAT_BC3_UNORM_SRGB:
-            SETP(out_internalformat, 0x8C4E);
-            SETP(out_format        , GL_RGBA);
-            SETP(out_datatype      , GL_UNSIGNED_BYTE);
+            out_internalformat = 0x8C4E;
+            out_format         = GL_RGBA;
+            out_datatype       = GL_UNSIGNED_BYTE;
             return true;
         case data::DXGI_FORMAT_BC5_UNORM:
-            SETP(out_internalformat, GL_COMPRESSED_RGBA_S3TC_DXT5_EXT);
-            SETP(out_format        , GL_RGBA);
-            SETP(out_datatype      , GL_UNSIGNED_BYTE);
+            out_internalformat = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
+            out_format         = GL_RGBA;
+            out_datatype       = GL_UNSIGNED_BYTE;
             return true;
         case data::DXGI_FORMAT_B5G6R5_UNORM:
-            SETP(out_internalformat, GL_RGB);
-            SETP(out_format        , GL_BGR);
-            SETP(out_datatype      , GL_UNSIGNED_SHORT_5_6_5_REV);
+            out_internalformat = GL_RGB;
+            out_format         = GL_BGR;
+            out_datatype       = GL_UNSIGNED_SHORT_5_6_5_REV;
             return true;
         case data::DXGI_FORMAT_B5G5R5A1_UNORM:
-            SETP(out_internalformat, GL_RGBA);
-            SETP(out_format        , GL_BGRA);
-            SETP(out_datatype      , GL_UNSIGNED_SHORT_1_5_5_5_REV);
+            out_internalformat = GL_RGBA;
+            out_format         = GL_BGRA;
+            out_datatype       = GL_UNSIGNED_SHORT_1_5_5_5_REV;
             return true;
         case data::DXGI_FORMAT_B8G8R8A8_UNORM:
-            SETP(out_internalformat, GL_RGBA8);
-            SETP(out_format        , GL_BGRA);
-            SETP(out_datatype      , GL_UNSIGNED_INT_8_8_8_8_REV);
+            out_internalformat = GL_RGBA8;
+            out_format         = GL_BGRA;
+            out_datatype       = GL_UNSIGNED_INT_8_8_8_8_REV;
             return true;
         case data::DXGI_FORMAT_B8G8R8X8_UNORM:
-            SETP(out_internalformat, GL_RGBA8);
-            SETP(out_format        , GL_BGR);
-            SETP(out_datatype      , GL_UNSIGNED_INT_8_8_8_8_REV);
+            out_internalformat = GL_RGBA8;
+            out_format         = GL_BGR;
+            out_datatype       = GL_UNSIGNED_INT_8_8_8_8_REV;
             return true;
         case data::DXGI_FORMAT_R10G10B10_XR_BIAS_A2_UNORM:
-            SETP(out_internalformat, GL_RGB10_A2);
-            SETP(out_format        , GL_BGRA);
-            SETP(out_datatype      , GL_UNSIGNED_INT_2_10_10_10_REV);
+            out_internalformat = GL_RGB10_A2;
+            out_format         = GL_BGRA;
+            out_datatype       = GL_UNSIGNED_INT_2_10_10_10_REV;
             return true;
         case data::DXGI_FORMAT_B8G8R8A8_UNORM_SRGB:
-            SETP(out_internalformat, GL_SRGB8_ALPHA8);
-            SETP(out_format        , GL_BGRA);
-            SETP(out_datatype      , GL_UNSIGNED_INT_8_8_8_8_REV);
+            out_internalformat = GL_SRGB8_ALPHA8;
+            out_format         = GL_BGRA;
+            out_datatype       = GL_UNSIGNED_INT_8_8_8_8_REV;
             return true;
         case data::DXGI_FORMAT_B8G8R8X8_UNORM_SRGB:
-            SETP(out_internalformat, GL_SRGB8_ALPHA8);
-            SETP(out_format        , GL_BGR);
-            SETP(out_datatype      , GL_UNSIGNED_INT_8_8_8_8_REV);
+            out_internalformat = GL_SRGB8_ALPHA8;
+            out_format         = GL_BGR;
+            out_datatype       = GL_UNSIGNED_INT_8_8_8_8_REV;
             return true;
         case data::DXGI_FORMAT_BC6H_UF16:
-            SETP(out_internalformat, 0x8E8F);
-            SETP(out_format        , GL_RGB);
-            SETP(out_datatype      , GL_UNSIGNED_BYTE);
+            out_internalformat = 0x8E8F;
+            out_format         = GL_RGB;
+            out_datatype       = GL_UNSIGNED_BYTE;
             return true;
         case data::DXGI_FORMAT_BC6H_SF16:
-            SETP(out_internalformat, 0x8E8E);
-            SETP(out_format        , GL_RGB);
-            SETP(out_datatype      , GL_UNSIGNED_BYTE);
+            out_internalformat = 0x8E8E;
+            out_format         = GL_RGB;
+            out_datatype       = GL_UNSIGNED_BYTE;
             return true;
         case data::DXGI_FORMAT_BC7_UNORM:
-            SETP(out_internalformat, 0x8E8C);
-            SETP(out_format        , GL_RGBA);
-            SETP(out_datatype      , GL_UNSIGNED_BYTE);
+            out_internalformat = 0x8E8C;
+            out_format         = GL_RGBA;
+            out_datatype       = GL_UNSIGNED_BYTE;
             return true;
         case data::DXGI_FORMAT_BC7_UNORM_SRGB:
-            SETP(out_internalformat, 0x8E8D);
-            SETP(out_format        , GL_RGBA);
-            SETP(out_datatype      , GL_UNSIGNED_BYTE);
+            out_internalformat = 0x8E8D;
+            out_format         = GL_RGBA;
+            out_datatype       = GL_UNSIGNED_BYTE;
             return true;
         case data::DXGI_FORMAT_P8:
-            SETP(out_internalformat, GL_R8);
-            SETP(out_format        , GL_RED);
-            SETP(out_datatype      , GL_UNSIGNED_BYTE);
+            out_internalformat = GL_R8;
+            out_format         = GL_RED;
+            out_datatype       = GL_UNSIGNED_BYTE;
             return true;
         case data::DXGI_FORMAT_A8P8:
-            SETP(out_internalformat, GL_RG8);
-            SETP(out_format        , GL_RG);
-            SETP(out_datatype      , GL_UNSIGNED_BYTE);
+            out_internalformat = GL_RG8;
+            out_format         = GL_RG;
+            out_datatype       = GL_UNSIGNED_BYTE;
             return true;
         case data::DXGI_FORMAT_B4G4R4A4_UNORM:
-            SETP(out_internalformat, GL_RGBA4);
-            SETP(out_format        , GL_BGRA);
-            SETP(out_datatype      , GL_UNSIGNED_SHORT_4_4_4_4_REV);
+            out_internalformat = GL_RGBA4;
+            out_format         = GL_BGRA;
+            out_datatype       = GL_UNSIGNED_SHORT_4_4_4_4_REV;
             return true;
         default:
             break;
@@ -642,7 +655,7 @@ bool r2d::create_atlas_entry(r2d::atlas_entry_t *ent, uint32_t name, size_t fram
         ent->MaxWidth    = 0;
         ent->MaxHeight   = 0;
         ent->Page0       = 0;
-        ent->Frame0      = { 
+        ent->Frame0      = {
             0, 0, 0, 0
         };
         if (frame_count == 1)
@@ -655,7 +668,7 @@ bool r2d::create_atlas_entry(r2d::atlas_entry_t *ent, uint32_t name, size_t fram
         {   // multi-frame entries allocate separate array storage.
             ent->Flags  |= r2d::ATLAS_ENTRY_MULTIFRAME;
             ent->PageIds = (size_t*)            malloc(frame_count * sizeof(size_t));
-            ent->Frames  = (r2d::atlas_frame_t*)malloc(frame_count * sizeof(r2d::atlas_frame_t)); 
+            ent->Frames  = (r2d::atlas_frame_t*)malloc(frame_count * sizeof(r2d::atlas_frame_t));
         }
         return true;
     }
@@ -686,11 +699,182 @@ void r2d::set_atlas_entry_frame(r2d::atlas_entry_t *ent, size_t frame_index, siz
 
     if (frame.Height > ent->MaxHeight)
         ent->MaxHeight = frame.Height;
-    
+
     if (frame_index > 0 && ent->PageIds[frame_index] != page_id)
         ent->Flags    |= r2d::ATLAS_ENTRY_MULTIPAGE;
 
     ent->PageIds[frame_index] = page_id;
     ent->Frames [frame_index] = frame;
 }
+
+bool r2d::create_image_cache(r2d::image_cache_t *cache, r2d::image_cache_config_t const &config)
+{
+    if (cache != NULL)
+    {
+        GLint   nalign         = 4;
+        GLsizei nbytes         = 0;
+        cache->PageWidth       = config.PageWidth;
+        cache->PageHeight      = config.PageHeight;
+        cache->HorizontalPad   = config.HorizontalPad;
+        cache->VerticalPad     = config.VerticalPad;
+        cache->EntryCapacity   = 0;
+        cache->EntryCount      = 0;
+        cache->EntryList       = NULL;
+        cache->PageCapacity    = 0;
+        cache->PageCount       = 0;
+        cache->TexturePages    = NULL;
+        cache->BucketCount     = config.ExpectedCount / IMAGE_CACHE_NAMES_PER_BUCKET;
+        cache->EntryNames      = NULL;
+        cache->PageLayout      = config.Layout;
+        cache->PageFormat      = config.Format;
+        cache->PageDataType    = config.DataType;
+        cache->TransferBuffer  = 0;
+        cache->TransferBytes   = 0;
+        cache->BufferOffset    = 0;
+        if (cache->BucketCount < IMAGE_CACHE_MIN_BUCKET_COUNT)
+            cache->BucketCount = IMAGE_CACHE_MIN_BUCKET_COUNT;
+
+        // pre-allocate storage for the entry lookup-by-name table.
+        cache->EntryNames      = (uint32_t**) malloc(cache->BucketCount * sizeof(uint32_t*));
+        if (cache->EntryNames == NULL) goto error_cleanup;
+        for (size_t i = 0; i < cache->BucketCount; ++i)
+        {
+            cache->EntryNames[i]     = (uint32_t*) malloc((IMAGE_CACHE_NAMES_PER_BUCKET + 2) * sizeof(uint32_t));
+            if (cache->EntryNames[i] == NULL)
+                goto error_cleanup;
+            cache->EntryNames[i][0]  = IMAGE_CACHE_NAMES_PER_BUCKET; // capacity
+            cache->EntryNames[i][1]  = 0;                            // count
+        }
+
+        // pre-allocate storage for the entry list.
+        if (config.ExpectedCount > 0)
+        {
+            cache->EntryCapacity = config.ExpectedCount;
+            cache->EntryCount    = 0;
+            cache->EntryList     = (r2d::atlas_entry_t*) malloc(config.ExpectedCount * sizeof(r2d::atlas_entry_t));
+            if (cache->EntryList == NULL) goto error_cleanup;
+        }
+
+        // pre-allocate storage for page texture IDs.
+        cache->TexturePages = (GLuint*) malloc(IMAGE_CACHE_PAGE_CAPACITY * sizeof(GLuint));
+        if (cache->TexturePages == NULL) goto error_cleanup;
+        cache->PageCapacity = IMAGE_CACHE_PAGE_CAPACITY;
+        cache->PageCount    = 0;
+
+        // generate the PBO used to stream data to the GPU.
+        glGenBuffers(1, &cache->TransferBuffer);
+        if (cache->TransferBuffer == 0) goto error_cleanup;
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, cache->TransferBuffer);
+        glGetIntegerv(GL_UNPACK_ALIGNMENT , &nalign);
+        nbytes = gl::bytes_per_slice(config.Format, config.DataType, config.PageWidth, config.PageHeight, size_t(nalign));
+        glBufferData(GL_PIXEL_UNPACK_BUFFER, nbytes, NULL, GL_STREAM_DRAW);
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+        cache->TransferBytes = size_t(nbytes);
+        cache->BufferOffset  = 0;
+        return true;
+
+error_cleanup:
+        if (cache->TransferBuffer != 0)
+        {
+            glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+            glDeleteBuffers(1, &cache->TransferBuffer);
+        }
+        if (cache->TexturePages != NULL)
+        {
+            free(cache->TexturePages);
+        }
+        if (cache->EntryNames != NULL)
+        {
+            for (size_t i = 0; i < cache->BucketCount; ++i)
+            {
+                if (cache->EntryNames[i] != NULL)
+                {
+                    free(cache->EntryNames[i]);
+                    cache->EntryNames[i]  = NULL;
+                }
+            }
+            free(cache->EntryNames);
+        }
+        if (cache->EntryList != NULL)
+        {
+            free(cache->EntryList);
+        }
+        cache->EntryCapacity  = 0;
+        cache->EntryCount     = 0;
+        cache->EntryList      = NULL;
+        cache->PageCapacity   = 0;
+        cache->PageCount      = 0;
+        cache->TexturePages   = NULL;
+        cache->BucketCount    = 0;
+        cache->EntryNames     = NULL;
+        cache->TransferBuffer = 0;
+        cache->TransferBytes  = 0;
+        cache->BufferOffset   = 0;
+        return false;
+    }
+    else return false;
+}
+
+void r2d::delete_image_cache(r2d::image_cache_t *cache)
+{
+    if (cache != NULL)
+    {
+        if (cache->TransferBuffer != 0)
+        {   // if the buffer is in use, it will be 
+            // deleted when the GPU is finished with it.
+            glDeleteBuffers(1, &cache->TransferBuffer);
+        }
+        if (cache->TexturePages != NULL)
+        {
+            if (cache->PageCount > 0)
+            {   // any textures in use will be deleted when the GPU is done with them.
+                glDeleteTextures(GLsizei(cache->PageCount), cache->TexturePages);
+            }
+            free(cache->TexturePages);
+        }
+        if (cache->EntryNames != NULL)
+        {
+            for (size_t i = 0; i < cache->BucketCount; ++i)
+            {
+                if (cache->EntryNames[i] != NULL)
+                {
+                    free(cache->EntryNames[i]);
+                    cache->EntryNames[i]  = NULL;
+                }
+            }
+            free(cache->EntryNames);
+        }
+        if (cache->EntryList != NULL)
+        {
+            free(cache->EntryList);
+        }
+        cache->EntryCapacity  = 0;
+        cache->EntryCount     = 0;
+        cache->EntryList      = NULL;
+        cache->PageCapacity   = 0;
+        cache->PageCount      = 0;
+        cache->TexturePages   = NULL;
+        cache->BucketCount    = 0;
+        cache->EntryNames     = NULL;
+        cache->TransferBuffer = 0;
+        cache->TransferBytes  = 0;
+        cache->BufferOffset   = 0;
+    }
+}
+
+void r2d::freeze_image_cache(r2d::image_cache_t *cache)
+{
+    if (cache->TransferBuffer != 0)
+    {
+        glDeleteBuffers(1, &cache->TransferBuffer);
+        cache->TransferBuffer  = 0;
+        cache->TransferBytes   = 0;
+        cache->BufferOffset    = 0;
+    }
+}
+
+// use glMapBufferRange at cache->BufferOffset, for gl::bytes_per_slice(image_to_copy),
+// memcpy the entire source data to the PBO, glUnmapBuffer, and then glTexSubImage2D 
+// (via the gl::pixel_transfer_h2d() function) to queue the async upload. if not 
+// enough buffer space, map with discard.
 

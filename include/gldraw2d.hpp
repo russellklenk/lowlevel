@@ -138,6 +138,20 @@ struct atlas_entry_t
     r2d::atlas_frame_t  Frame0;        /// Statically allocated storage for the first frame.
 };
 
+/// @summary Defines the configuration data for an image cache, used to dynamically
+/// build texture atlases (without mipmaps) for 2D content such as GUIs and sprites.
+struct image_cache_config_t
+{
+    size_t              PageWidth;     /// The width of the texture page(s), in pixels.
+    size_t              PageHeight;    /// The height of the texture page(s), in pixels.
+    size_t              HorizontalPad; /// The horizontal padding amount, in pixels.
+    size_t              VerticalPad;   /// The vertical padding amount, in pixels.
+    size_t              ExpectedCount; /// The number of images expected to be cached, or 0.
+    GLenum              Layout;        /// The OpenGL pixel layout of the texture page(s), ex. GL_BGRA.
+    GLenum              Format;        /// The OpenGL internal format of the texture page(s), ex. GL_RGBA8.
+    GLenum              DataType;      /// The OpenGL data type of the texture page(s), ex. GL_UNSIGNED_INT_8_8_8_8_REV.
+};
+
 /// @summary Dynamically builds texture atlases (without mipmaps) for 2D content
 /// such as GUIs and sprites. Each texture object is referred to as a page.
 /// Updates are streamed to the texture object using a pixel buffer object.
@@ -149,11 +163,18 @@ struct image_cache_t
     size_t              VerticalPad;   /// The vertical padding between sub-images, in pixels.
     size_t              EntryCapacity; /// The number of entries that can be stored.
     size_t              EntryCount;    /// The number of entries currently valid.
-    r2d::atlas_entry_t *PageEntries;   /// The set of entries across all pages.
+    r2d::atlas_entry_t *EntryList;     /// The set of entries across all pages.
+    size_t              PageCapacity;  /// The number of texture page IDs that can be stored.
+    size_t              PageCount;     /// The number of texture pages used. 
     GLuint             *TexturePages;  /// The set of OpenGL texture object IDs.
     size_t              BucketCount;   /// The number of buckets defined in the name->index table.
     uint32_t          **EntryNames;    /// A table mapping entry name->index in PageEntries.
+    GLenum              PageLayout;    /// The OpenGL pixel layout of the texture page(s), ex. GL_BGRA.
+    GLenum              PageFormat;    /// The OpenGL internal format of the texture page(s),  ex. GL_RGBA8.
+    GLenum              PageDataType;  /// The OpenGL data type of the texture page(s), ex. GL_UNSIGNED_INT_8_8_8_8_REV.
     GLuint              TransferBuffer;/// The OpenGL pixel buffer object ID.
+    size_t              TransferBytes; /// The size of the transfer buffer, in bytes.
+    size_t              BufferOffset;  /// The current byte offset into the transfer buffer.
 };
 
 /*/////////////////
@@ -164,10 +185,10 @@ struct image_cache_t
 /// when loading texture data from a DDS container.
 /// @param dxgi A value of the DXGI_FORMAT enumeration (data::dxgi_format_e).
 /// @param out_internalformat On return, stores the corresponding OpenGL internal format.
-/// @param out_baseformat On return, stores the corresponding OpenGL base format.
+/// @param out_baseformat On return, stores the corresponding OpenGL base format (layout).
 /// @param out_datatype On return, stores the corresponding OpenGL data type.
 /// @return true if the input format could be mapped to OpenGL.
-GLDRAW2D_PUBLIC bool dxgi_format_to_gl(uint32_t dxgi, GLenum *out_internalformat, GLenum *out_format, GLenum *out_datatype);
+GLDRAW2D_PUBLIC bool dxgi_format_to_gl(uint32_t dxgi, GLenum &out_internalformat, GLenum &out_format, GLenum &out_datatype);
 
 /// @summary Initializes an packer for dynamically packing several rectangles
 /// representing images onto a single, larger rectangle.
@@ -216,6 +237,21 @@ GLDRAW2D_PUBLIC void delete_atlas_entry(r2d::atlas_entry_t *ent);
 /// @param page_id The identifier or index of the page containing the frame data.
 /// @param frame A description of the frame bounds within the texture page.
 GLDRAW2D_PUBLIC void set_atlas_entry_frame(r2d::atlas_entry_t *ent, size_t frame_index, size_t page_id, r2d::atlas_frame_t const &frame);
+
+/// @summary Allocates internal storage and GPU resources for an image cache.
+/// @param cache The image cache to initialize.
+/// @param config Image cache configuration parameters.
+/// @return true if the image cache was successfully initialized.
+GLDRAW2D_PUBLIC bool create_image_cache(r2d::image_cache_t *cache, r2d::image_cache_config_t const &config);
+
+/// @summary Frees all storage and GPU resources associated with an image cache.
+/// @param cache The image cache to delete.
+GLDRAW2D_PUBLIC void delete_image_cache(r2d::image_cache_t *cache);
+
+/// @summary Indicates that no more images will be uploaded to the specified 
+/// cache, and deletes the transfer object associated with the cache.
+/// @param cache The image cache to freeze.
+GLDRAW2D_PUBLIC void freeze_image_cache(r2d::image_cache_t *cache);
 
     // we need:
     // a sprite batch for solid-colored quads
