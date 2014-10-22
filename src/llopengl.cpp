@@ -1067,7 +1067,7 @@ size_t gl::image_dimension(GLenum internal_format, size_t dimension)
     return dimension;
 }
 
-GLenum gl::base_format(GLenum internal_format)
+GLenum gl::pixel_layout(GLenum internal_format)
 {
     switch (internal_format)
     {
@@ -1265,7 +1265,7 @@ void gl::describe_mipmaps(
     size_t slices      = slice_count;
     GLenum type        = data_type;
     GLenum format      = internal_format;
-    GLenum base_fmt    = gl::base_format(format);
+    GLenum layout      = gl::pixel_layout(format);
     size_t bytes_per_e = gl::bytes_per_element(format, type);
     size_t num_levels  = gl::level_count(width, height, slices, max_levels);
 
@@ -1281,9 +1281,9 @@ void gl::describe_mipmaps(
         level_desc[i].BytesPerElement = bytes_per_e;
         level_desc[i].BytesPerRow     = gl::bytes_per_row(format, type, level_desc[i].Width, alignment);
         level_desc[i].BytesPerSlice   = level_desc[i].BytesPerRow * level_desc[i].Height;
+        level_desc[i].Layout          = layout;
         level_desc[i].Format          = internal_format;
         level_desc[i].DataType        = data_type;
-        level_desc[i].BaseFormat      = base_fmt;
     }
 }
 
@@ -1315,7 +1315,7 @@ void gl::texture_storage(
     size_t slice_count,
     size_t max_levels)
 {
-    GLenum base_fmt = gl::base_format(internal_format);
+    GLenum layout = gl::pixel_layout(internal_format);
 
     if (max_levels == 0)
     {
@@ -1355,7 +1355,7 @@ void gl::texture_storage(
                     for (size_t lod = 0; lod < max_levels; ++lod)
                     {
                         size_t lw = gl::level_dimension(width, lod);
-                        glTexImage1D(target, GLint(lod), internal_format, GLsizei(lw), 0, base_fmt, data_type, NULL);
+                        glTexImage1D(target, GLint(lod), internal_format, GLsizei(lw), 0, layout, data_type, NULL);
                     }
                 }
                 break;
@@ -1366,7 +1366,7 @@ void gl::texture_storage(
                     for (size_t lod = 0; lod < max_levels; ++lod)
                     {
                         size_t lw = gl::level_dimension(width, lod);
-                        glTexImage2D(target, GLint(lod), internal_format, GLsizei(lw), GLsizei(slice_count), 0, base_fmt, data_type, NULL);
+                        glTexImage2D(target, GLint(lod), internal_format, GLsizei(lw), GLsizei(slice_count), 0, layout, data_type, NULL);
                     }
                 }
                 break;
@@ -1374,7 +1374,7 @@ void gl::texture_storage(
             case GL_TEXTURE_RECTANGLE:
                 {
                     // rectangle textures don't support mipmaps.
-                    glTexImage2D(target, 0, internal_format, GLsizei(width), GLsizei(height), 0, base_fmt, data_type, NULL);
+                    glTexImage2D(target, 0, internal_format, GLsizei(width), GLsizei(height), 0, layout, data_type, NULL);
                 }
                 break;
 
@@ -1390,7 +1390,7 @@ void gl::texture_storage(
                     {
                         size_t lw = gl::level_dimension(width,  lod);
                         size_t lh = gl::level_dimension(height, lod);
-                        glTexImage2D(target, GLint(lod), internal_format, GLsizei(lw), GLsizei(lh), 0, base_fmt, data_type, NULL);
+                        glTexImage2D(target, GLint(lod), internal_format, GLsizei(lw), GLsizei(lh), 0, layout, data_type, NULL);
                     }
                 }
                 break;
@@ -1403,7 +1403,7 @@ void gl::texture_storage(
                     {
                         size_t lw = gl::level_dimension(width,  lod);
                         size_t lh = gl::level_dimension(height, lod);
-                        glTexImage3D(target, GLint(lod), internal_format, GLsizei(lw), GLsizei(lh), GLsizei(slice_count), 0, base_fmt, data_type, NULL);
+                        glTexImage3D(target, GLint(lod), internal_format, GLsizei(lw), GLsizei(lh), GLsizei(slice_count), 0, layout, data_type, NULL);
                     }
                 }
                 break;
@@ -1415,7 +1415,7 @@ void gl::texture_storage(
                         size_t lw = gl::level_dimension(width,       lod);
                         size_t lh = gl::level_dimension(height,      lod);
                         size_t ls = gl::level_dimension(slice_count, lod);
-                        glTexImage3D(target, GLint(lod), internal_format, GLsizei(lw), GLsizei(lh), GLsizei(ls), 0, base_fmt, data_type, NULL);
+                        glTexImage3D(target, GLint(lod), internal_format, GLsizei(lw), GLsizei(lh), GLsizei(ls), 0, layout, data_type, NULL);
                     }
                 }
                 break;
@@ -1484,7 +1484,7 @@ void gl::transfer_pixels_d2h(gl::pixel_transfer_d2h_t *transfer)
                         GLint(transfer->TransferY),
                         GLint(transfer->TransferWidth),
                         GLint(transfer->TransferHeight),
-                        transfer->Format,
+                        transfer->Layout,
                         transfer->DataType,
                         transfer->TransferBuffer);
                 }
@@ -1506,7 +1506,7 @@ void gl::transfer_pixels_d2h(gl::pixel_transfer_d2h_t *transfer)
                     glGetTexImage(
                         transfer->Target,
                         GLint(transfer->SourceIndex),
-                        transfer->Format,
+                        transfer->Layout,
                         transfer->DataType,
                         transfer->TransferBuffer);
                 }
@@ -2239,3 +2239,4 @@ void gl::delete_sprite_shader_ptc_tex(gl::sprite_shader_ptc_tex_t *shader)
         shader->Program    = 0;
     }
 }
+

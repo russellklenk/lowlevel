@@ -189,9 +189,9 @@ struct level_desc_t
     size_t BytesPerElement; /// The number of bytes per-channel or pixel
     size_t BytesPerRow;     /// The number of bytes per-row
     size_t BytesPerSlice;   /// The number of bytes per-slice
+    GLenum Layout;          /// The OpenGL base format
     GLenum Format;          /// The OpenGL internal format
     GLenum DataType;        /// The OpenGL element data type
-    GLenum BaseFormat;      /// The OpenGL base format
 };
 
 /// @summary Describes a transfer of pixel data from the device (GPU) to the
@@ -207,7 +207,8 @@ struct level_desc_t
 struct pixel_transfer_d2h_t
 {
     GLenum Target;          /// The image source, ex. GL_READ_FRAMEBUFFER or GL_TEXTURE_2D
-    GLenum Format;          /// The desired pixel data format, ex. GL_BGRA
+    GLenum Layout;          /// The desired pixel data layout, ex. GL_BGRA
+    GLenum Format;          /// The internal format of the source, ex. GL_RGBA8
     GLenum DataType;        /// The desired pixel data type, ex. GL_UNSIGNED_INT_8_8_8_8_REV
     GLuint PackBuffer;      /// The PBO to use as the pack target, or 0
     size_t SourceIndex;     /// The source mip level or array index, 0 for framebuffer
@@ -241,8 +242,8 @@ struct pixel_transfer_d2h_t
 struct pixel_transfer_h2d_t
 {
     GLenum Target;          /// The image target, ex. GL_TEXTURE_2D
-    GLenum Format;          /// The format of your pixel data, ex. GL_BGRA
-    GLenum DataType;        /// The layout of your pixel data, ex. GL_UNSIGNED_INT_8_8_8_8_REV
+    GLenum Format;          /// The internal format of your pixel data, ex. GL_RGBA8
+    GLenum DataType;        /// The data type of your pixel data, ex. GL_UNSIGNED_INT_8_8_8_8_REV
     GLuint UnpackBuffer;    /// The PBO to use as the unpack source, or 0
     size_t TargetIndex;     /// The target mip level or array index
     size_t TargetX;         /// The upper-left-front corner on the target texture
@@ -714,13 +715,12 @@ LLOPENGL_PUBLIC size_t bytes_per_slice(GLenum internal_format, GLenum data_type,
 /// returned value is always specified in pixels.
 LLOPENGL_PUBLIC size_t image_dimension(GLenum internal_format, size_t dimension);
 
-/// @summary Given an OpenGL internal format type value, determines the
-/// corresponding base format value.
+/// @summary Given an OpenGL internal format type value, determines the corresponding pixel layout.
 /// @param internal_format The OpenGL internal format value. See the
 /// documentation for glTexImage2D(), internalFormat argument.
 /// @return The OpenGL base internal format values. See the documentation for
 /// glTexImage2D(), format argument.
-LLOPENGL_PUBLIC GLenum base_format(GLenum internal_format);
+LLOPENGL_PUBLIC GLenum pixel_layout(GLenum internal_format);
 
 /// @summary Given an OpenGL sampler type value, determines the corresponding
 /// texture bind target identifier.
@@ -790,8 +790,8 @@ LLOPENGL_PUBLIC void checker_image(size_t width, size_t height, float alpha, voi
 /// are always set to GL_CLAMP_TO_EDGE. The caller is responsible for creating
 /// and binding the texture object prior to calling this function.
 /// @param target The OpenGL texture target, defining the texture type.
-/// @param internal_format The OpenGL internal format, for example GL_RGBA.
-/// @param data_type The OpenGL data type, for example, GL_UNSIGNED_BYTE.
+/// @param internal_format The OpenGL internal format, for example GL_RGBA8.
+/// @param data_type The OpenGL data type, for example, GL_UNSIGNED_INT_8_8_8_8_REV.
 /// @param min_filter The minification filter to use.
 /// @param mag_filter The magnification filter to use.
 /// @param width The width of the highest resolution image, in pixels.
