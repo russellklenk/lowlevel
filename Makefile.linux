@@ -1,0 +1,56 @@
+TARGET        = lib/libll.a
+LIBRARIES     = -lstdc++ -lm
+HEADERS       = $(wildcard include/*.hpp)
+SOURCES       = $(wildcard src/*.cpp)
+OBJECTS       = ${SOURCES:.cpp=.o}
+DEPENDENCIES  = ${SOURCES:.cpp=.dep}
+INCLUDE_DIRS  = -I. -Iinclude
+LIBRARY_DIRS  = -Llib
+PROJ_WARNINGS = -Wall -Wextra
+PROJ_CCFLAGS  = -ggdb -std=c++0x -O3 -fstrict-aliasing -D __STDC_FORMAT_MACROS
+PROJ_LDFLAGS  =
+TEST_TARGETS  = test/ddsinfo test/fntinfo test/tgainfo
+TEST_SOURCES  = $(wildcard test/*.cpp)
+TEST_OBJECTS  = ${TEST_SOURCES:.cpp=.o}
+TEST_DEPS     = ${TEST_SOURCES:.cpp=.dep}
+TEST_CCFLAGS  = -ggdb -std=c++0x -O3 -fstrict-aliasing -D __STDC_FORMAT_MACROS -DLLOPENGL_USE_GLEW
+TEST_LDFLAGS  = -Llib
+TEST_LIBRARIES= -lstdc++ -lm -lll -lGL -lopenal
+
+.PHONY: all clean distclean output tests
+
+all:: ${TARGET} ${TEST_TARGETS}
+
+${TARGET}: ${OBJECTS}
+	ar rcs $@ $^
+
+${OBJECTS}: %.o: %.cpp ${DEPENDENCIES}
+	${CC} ${INCLUDE_DIRS} ${CCFLAGS} ${PROJ_CCFLAGS} -o $@ -c $<
+
+${DEPENDENCIES}: %.dep: %.cpp ${HEADERS} Makefile.linux
+	${CC} ${INCLUDE_DIRS} ${CCFLAGS} ${PROJ_CCFLAGS} -MM $< > $@
+
+output:: ${TARGET}
+
+test/ddsinfo: ${TEST_OBJECTS}
+	${CC} ${LDFLAGS} ${TEST_LDFLAGS} -o $@ test/dds_info.o ${TEST_LIBRARIES}
+
+test/fntinfo: ${TEST_OBJECTS}
+	${CC} ${LDFLAGS} ${TEST_LDFLAGS} -o $@ test/fnt_info.o ${TEST_LIBRARIES}
+
+test/tgainfo: ${TEST_OBJECTS}
+	${CC} ${LDFLAGS} ${TEST_LDFLAGS} -o $@ test/tga_info.o ${TEST_LIBRARIES}
+
+${TEST_OBJECTS}: %.o: %.cpp ${TEST_DEPS}
+	${CC} ${INCLUDE_DIRS} ${CCFLAGS} ${TEST_CCFLAGS} -o $@ -c $<
+
+${TEST_DEPS}: %.dep: %.cpp ${HEADERS} Makefile.linux
+	${CC} ${INCLUDE_DIRS} ${CCFLAGS} ${TEST_CCFLAGS} -MM $< > $@
+
+tests:: ${TARGET} ${TEST_TARGETS}
+
+clean::
+	rm -f *~ *.o *.dep src/*~ src/*.o src/*.dep test/*~ test/*.o test/*.dep ${TARGET} ${TEST_TARGETS}
+
+distclean:: clean
+
