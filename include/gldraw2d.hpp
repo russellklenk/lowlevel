@@ -76,6 +76,13 @@ enum atlas_entry_flags_e
     ATLAS_ENTRY_MULTIPAGE  = (1 << 1)
 };
 
+/// @summary Defines metadata associated with a hash bucket.
+struct bucket_t
+{
+    size_t              Capacity;      /// The bucket capacity, in items.
+    size_t              Count;         /// The number of items currently in-use.
+};
+
 /// @summary Represents a single node in a binary tree used for packing
 /// rectangles within a single, larger master rectangle.
 struct pknode_t
@@ -140,7 +147,7 @@ struct atlas_entry_t
 
 /// @summary Defines the configuration data for an image cache, used to dynamically
 /// build texture atlases (without mipmaps) for 2D content such as GUIs and sprites.
-struct image_cache_config_t
+struct atlas_config_t
 {
     size_t              PageWidth;     /// The width of the texture page(s), in pixels.
     size_t              PageHeight;    /// The height of the texture page(s), in pixels.
@@ -155,7 +162,7 @@ struct image_cache_config_t
 /// @summary Dynamically builds texture atlases (without mipmaps) for 2D content
 /// such as GUIs and sprites. Each texture object is referred to as a page.
 /// Updates are streamed to the texture object using a pixel buffer object.
-struct image_cache_t
+struct atlas_t
 {
     size_t              PageWidth;     /// The width of a texture page, in pixels.
     size_t              PageHeight;    /// The height of a texture page, in pixels.
@@ -165,10 +172,13 @@ struct image_cache_t
     size_t              EntryCount;    /// The number of entries currently valid.
     r2d::atlas_entry_t *EntryList;     /// The set of entries across all pages.
     size_t              PageCapacity;  /// The number of texture page IDs that can be stored.
-    size_t              PageCount;     /// The number of texture pages used. 
+    size_t              PageCount;     /// The number of texture pages used.
+    r2d::packer_t      *PagePackers;   /// The list of rectangle packers used to place sub-images on the page.
     GLuint             *TexturePages;  /// The set of OpenGL texture object IDs.
     size_t              BucketCount;   /// The number of buckets defined in the name->index table.
-    uint32_t          **EntryNames;    /// A table mapping entry name->index in PageEntries.
+    r2d::bucket_t      *BucketList;    /// The list of bucket metadata; BucketCount items.
+    uint32_t          **EntryNames;    /// A table mapping entry name->index in EntryList.
+    uint32_t          **EntryIndices;  /// A table mapping entry name->index in EntryList.
     GLenum              PageLayout;    /// The OpenGL pixel layout of the texture page(s), ex. GL_BGRA.
     GLenum              PageFormat;    /// The OpenGL internal format of the texture page(s),  ex. GL_RGBA8.
     GLenum              PageDataType;  /// The OpenGL data type of the texture page(s), ex. GL_UNSIGNED_INT_8_8_8_8_REV.
@@ -238,20 +248,73 @@ GLDRAW2D_PUBLIC void delete_atlas_entry(r2d::atlas_entry_t *ent);
 /// @param frame A description of the frame bounds within the texture page.
 GLDRAW2D_PUBLIC void set_atlas_entry_frame(r2d::atlas_entry_t *ent, size_t frame_index, size_t page_id, r2d::atlas_frame_t const &frame);
 
-/// @summary Allocates internal storage and GPU resources for an image cache.
-/// @param cache The image cache to initialize.
-/// @param config Image cache configuration parameters.
-/// @return true if the image cache was successfully initialized.
-GLDRAW2D_PUBLIC bool create_image_cache(r2d::image_cache_t *cache, r2d::image_cache_config_t const &config);
+/// @summary Allocates internal storage and GPU resources for an image atlas.
+/// @param atlas The image atlas to initialize.
+/// @param config Image atlas configuration parameters.
+/// @return true if the image atlas was successfully initialized.
+GLDRAW2D_PUBLIC bool create_atlas(r2d::atlas_t *atlas, r2d::atlas_config_t const &config);
 
-/// @summary Frees all storage and GPU resources associated with an image cache.
-/// @param cache The image cache to delete.
-GLDRAW2D_PUBLIC void delete_image_cache(r2d::image_cache_t *cache);
+/// @summary Frees all storage and GPU resources associated with an image atlas.
+/// @param atlas The image atlas to delete.
+GLDRAW2D_PUBLIC void delete_atlas(r2d::atlas_t *atlas);
 
-/// @summary Indicates that no more images will be uploaded to the specified 
-/// cache, and deletes the transfer object associated with the cache.
-/// @param cache The image cache to freeze.
-GLDRAW2D_PUBLIC void freeze_image_cache(r2d::image_cache_t *cache);
+/// @summary Indicates that no more images will be uploaded to the specified
+/// atlas, and deletes the transfer object associated with the atlas.
+/// @param atlas The image atlas to freeze.
+GLDRAW2D_PUBLIC void freeze_atlas(r2d::atlas_t *atlas);
+
+/// @summary Locates the metadata for an item within an image atlas given its name.
+/// @param atlas The image atlas to search.
+/// @param name The 32-bit unique identifier of the item specified when the item was added.
+/// @return The associated metadata, or NULL.
+GLDRAW2D_PUBLIC r2d::atlas_entry_t* find_atlas_entry(r2d::atlas_t *atlas, uint32_t name);
+
+/// @summary Locates the metadata for an item within an image atlas given its index.
+/// @param atlas The image atlas to search.
+/// @param index The zero-based index of the entry to retrieve.
+/// @return The associated metadata, or NULL.
+GLDRAW2D_PUBLIC r2d::atlas_entry_t* get_atlas_entry(r2d::atlas_t *atlas, size_t index);
+
+/// @summary Creates a logical entry on the texture atlas. This only allocates the necessary
+/// structures; it does not place any images or upload any data to texture pages.
+/// @param atlas The image atlas to update.
+/// @param name A unique 32-bit integer identifier for the image withih the atlas.
+/// @param frame_count The number of frames in the animation sequence.
+/// @param out_index On return, this location stores the index of the associated atlas entry
+/// within the image atlas, which can be used to look up placement information.
+/// @return true if the image was placed.
+GLDRAW2D_PUBLIC r2d::atlas_entry_t* atlas_add(r2d::atlas_t *atlas, uint32_t name, size_t frame_count, size_t *out_index);
+
+/// @summary Places an image within the texture atlas. This only reserves the space for the
+/// image; it does not upload any data to texture pages.
+/// @param atlas The image atlas to update.
+/// @param entry The logical entry within the atlas to modify.
+/// @param frame The zero-based index of the frame being placed.
+/// @param width The width of the frame, in pixels.
+/// @param height The height of the frame, in pixels.
+/// @return true if the image was successfully placed on the atlas.
+GLDRAW2D_PUBLIC bool atlas_place_frame(r2d::atlas_t *atlas, r2d::atlas_entry_t *entry, size_t frame, size_t width, size_t height);
+
+/// @summary Places an image within the texture atlas. This only reserves the space for the
+/// image; it does not upload any data to texture pages.
+/// @param atlas The image atlas to update.
+/// @param entry The logical entry within the atlas to modify.
+/// @param frame The zero-based index of the frame being placed.
+/// @param width The width of the frame, in pixels.
+/// @param height The height of the frame, in pixels.
+/// @param hpad The amount of padding along the horizontal edges of the image, in pixels.
+/// @param vpad The amount of padding along the vertical edges of the image, in pixels.
+/// @return true if the image was successfully placed on the atlas.
+GLDRAW2D_PUBLIC bool atlas_place_frame(r2d::atlas_t *atlas, r2d::atlas_entry_t *entry, size_t frame, size_t width, size_t height, size_t hpad, size_t vpad);
+
+/// @summary Transfers pixel data for an image or frame to the associated texture page.
+/// @param atlas The atlas on which the entry has been placed.
+/// @param entry The metadata of the entry to update, retrieved with [find|get]_atlas_entry().
+/// @param frame The zero-based index of the frame whose data is being transferred.
+/// @param pixels The pixel data to transfer. This data is copied to a pixel buffer object
+/// and then queued for asynchronous transfer to the GPU.
+/// @return true if the pixel data transfer was scheduled.
+GLDRAW2D_PUBLIC bool atlas_transfer_frame(r2d::atlas_t *atlas, r2d::atlas_entry_t *entry, size_t frame, void const *pixels);
 
     // we need:
     // a sprite batch for solid-colored quads

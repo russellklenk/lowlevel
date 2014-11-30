@@ -1,5 +1,5 @@
 /*/////////////////////////////////////////////////////////////////////////////
-/// @summary
+/// @summary Implements a basic 2D renderer for sprites and GUI controls.
 /// @author Russell Klenk (contact@russellklenk.com)
 ///////////////////////////////////////////////////////////////////////////80*/
 
@@ -15,19 +15,19 @@
 //   Constants   //
 /////////////////*/
 /// @summary The desired number of uint32_t names per-bucket.
-static size_t const IMAGE_CACHE_NAMES_PER_BUCKET = 16;
+static size_t const ATLAS_NAMES_PER_BUCKET = 16;
 
 /// @summary The default capacity of an image cache, in images.
-static size_t const IMAGE_CACHE_DEFAULT_CAPACITY = 1024;
+static size_t const ATLAS_DEFAULT_CAPACITY = 1024;
 
 /// @summary The zero-based index of the first name within a bucket.
-static size_t const IMAGE_CACHE_FIRST_NAME       = 2;
+static size_t const ATLAS_FIRST_NAME       = 2;
 
 /// @summary Define the minimum number of name buckets allocated per-image cache.
-static size_t const IMAGE_CACHE_MIN_BUCKET_COUNT = IMAGE_CACHE_DEFAULT_CAPACITY / IMAGE_CACHE_NAMES_PER_BUCKET;
+static size_t const ATLAS_MIN_BUCKET_COUNT = ATLAS_DEFAULT_CAPACITY / ATLAS_NAMES_PER_BUCKET;
 
 /// @summary Define the default capacity of the TexturePages texture ID storage.
-static size_t const IMAGE_CACHE_PAGE_CAPACITY    = 4;
+static size_t const ATLAS_PAGE_CAPACITY    = 4;
 
 /*///////////////
 //   Globals   //
@@ -36,10 +36,385 @@ static size_t const IMAGE_CACHE_PAGE_CAPACITY    = 4;
 /*//////////////////
 //   Data Types   //
 //////////////////*/
+/// @summary Defines the data required to represent a priority queue of rectangles ordered by
+/// some criteria, such as minimum or maximum extent, minimum or maximum area, and so on.
+struct rectq_t
+{
+    size_t  Count;     /// The number of items currently in the queue.
+    size_t *Index;     /// An array of rectangle index values.
+    size_t *Width;     /// An array of rectangle width values.
+    size_t *Height;    /// An array of rectangle height values.
+};
+
+/// @summary A functor type used for ordering rectangles into ascending order by width.
+struct rectq_minw_t
+{
+    /// @summary The function operator. Compares two rectangle values.
+    /// @param pq The rectangle priority queue being heapified.
+    /// @param a The zero-based index of the first rectangle.
+    /// @param b The zero-based index of the second rectangle.
+    /// @return -1 if the width of rectangle a is smaller than that of rectangle b.
+    ///         +1 if the width of rectangle a is larger than that of rectangle b.
+    ///          0 if the rectangles have the same width.
+    inline int operator()(rectq_t const *pq, size_t const a, size_t const b) const
+    {
+        size_t const * V = pq->Width;
+        return (V[a] < V[b]) ? -1 : ((V[a] > V[b]) ? +1 : 0);
+    }
+    /// @summary The function operator. Compares two rectangle values.
+    /// @param pq The rectangle priority queue being heapified.
+    /// @param w The width of the rectangle being inserted.
+    /// @param h The height of the rectangle being inserted.
+    /// @param b The zero-based index of the second rectangle.
+    /// @return -1 if the width of rectangle a is smaller than that of rectangle b.
+    ///         +1 if the width of rectangle a is larger than that of rectangle b.
+    ///          0 if the rectangles have the same width.
+    inline int operator()(rectq_t const *pq, size_t const w, size_t const h, size_t const b) const
+    {
+        size_t const * V = pq->Width;
+        return (w < V[b]) ? -1 : ((w > V[b]) ? +1 : 0);
+    }
+};
+
+/// @summary A functor type used for ordering rectangles into descending order by width.
+struct rectq_maxw_t
+{
+    /// @summary The function operator. Compares two rectangle values.
+    /// @param pq The rectangle priority queue being heapified.
+    /// @param a The zero-based index of the first rectangle.
+    /// @param b The zero-based index of the second rectangle.
+    /// @return -1 if the width of rectangle a is larger than that of rectangle b.
+    ///         +1 if the width of rectangle a is smaller than that of rectangle b.
+    ///          0 if the rectangles have the same width.
+    inline int operator()(rectq_t const *pq, size_t const a, size_t const b) const
+    {
+        size_t const * V = pq->Width;
+        return (V[a] < V[b]) ? +1 : ((V[a] > V[b]) ? -1 : 0);
+    }
+    /// @summary The function operator. Compares two rectangle values.
+    /// @param pq The rectangle priority queue being heapified.
+    /// @param w The width of the rectangle being inserted.
+    /// @param h The height of the rectangle being inserted.
+    /// @param b The zero-based index of the second rectangle.
+    /// @return -1 if the width of rectangle a is larger than that of rectangle b.
+    ///         +1 if the width of rectangle a is smaller than that of rectangle b.
+    ///          0 if the rectangles have the same width.
+    inline int operator()(rectq_t const *pq, size_t const w, size_t const h, size_t const b) const
+    {
+        size_t const * V = pq->Width;
+        return (w < V[b]) ? +1 : ((w > V[b]) ? -1 : 0);
+    }
+};
+
+/// @summary A functor type used for ordering rectangles into ascending order by height.
+struct rectq_minh_t
+{
+    /// @summary The function operator. Compares two rectangle values.
+    /// @param pq The rectangle priority queue being heapified.
+    /// @param a The zero-based index of the first rectangle.
+    /// @param b The zero-based index of the second rectangle.
+    /// @return -1 if the height of rectangle a is smaller than that of rectangle b.
+    ///         +1 if the height of rectangle a is larger than that of rectangle b.
+    ///          0 if the rectangles have the same height.
+    inline int operator()(rectq_t const *pq, size_t const a, size_t const b) const
+    {
+        size_t const * V = pq->Height;
+        return (V[a] < V[b]) ? -1 : ((V[a] > V[b]) ? +1 : 0);
+    }
+    /// @summary The function operator. Compares two rectangle values.
+    /// @param pq The rectangle priority queue being heapified.
+    /// @param w The width of the rectangle being inserted.
+    /// @param h The height of the rectangle being inserted.
+    /// @param b The zero-based index of the second rectangle.
+    /// @return -1 if the height of rectangle a is smaller than that of rectangle b.
+    ///         +1 if the height of rectangle a is larger than that of rectangle b.
+    ///          0 if the rectangles have the same height.
+    inline int operator()(rectq_t const *pq, size_t const w, size_t const h, size_t const b) const
+    {
+        size_t const * V = pq->Height;
+        return (h < V[b]) ? -1 : ((h > V[b]) ? +1 : 0);
+    }
+};
+
+/// @summary A functor type used for ordering rectangles into descending order by height.
+struct rectq_maxh_t
+{
+    /// @summary The function operator. Compares two rectangle values.
+    /// @param pq The rectangle priority queue being heapified.
+    /// @param a The zero-based index of the first rectangle.
+    /// @param b The zero-based index of the second rectangle.
+    /// @return -1 if the height of rectangle a is larger than that of rectangle b.
+    ///         +1 if the height of rectangle a is smaller than that of rectangle b.
+    ///          0 if the rectangles have the same width.
+    inline int operator()(rectq_t const *pq, size_t const a, size_t const b) const
+    {
+        size_t const * V = pq->Height;
+        return (V[a] < V[b]) ? +1 : ((V[a] > V[b]) ? -1 : 0);
+    }
+    /// @summary The function operator. Compares two rectangle values.
+    /// @param pq The rectangle priority queue being heapified.
+    /// @param w The width of the rectangle being inserted.
+    /// @param h The height of the rectangle being inserted.
+    /// @param b The zero-based index of the second rectangle.
+    /// @return -1 if the height of rectangle a is larger than that of rectangle b.
+    ///         +1 if the height of rectangle a is smaller than that of rectangle b.
+    ///          0 if the rectangles have the same width.
+    inline int operator()(rectq_t const *pq, size_t const w, size_t const h, size_t const b) const
+    {
+        size_t const * V = pq->Height;
+        return (h < V[b]) ? +1 : ((h > V[b]) ? -1 : 0);
+    }
+};
+
+/// @summary A functor type used for ordering rectangles into ascending order by area.
+struct rectq_mina_t
+{
+    /// @summary The function operator. Compares two rectangle values.
+    /// @param pq The rectangle priority queue being heapified.
+    /// @param a The zero-based index of the first rectangle.
+    /// @param b The zero-based index of the second rectangle.
+    /// @return -1 if the area of rectangle a is smaller than that of rectangle b.
+    ///         +1 if the area of rectangle a is larger than that of rectangle b.
+    ///          0 if the rectangles have the same area.
+    inline int operator()(rectq_t const *pq, size_t const a, size_t const b) const
+    {
+        size_t const A = pq->Width[a]  * pq->Height[a];
+        size_t const B = pq->Width[b]  * pq->Height[b];
+        return (A < B) ? -1 : ((A > B) ? +1 : 0);
+    }
+    /// @summary The function operator. Compares two rectangle values.
+    /// @param pq The rectangle priority queue being heapified.
+    /// @param a The zero-based index of the first rectangle.
+    /// @param b The zero-based index of the second rectangle.
+    /// @param w The width of the rectangle being inserted.
+    /// @param h The height of the rectangle being inserted.
+    /// @return -1 if the area of rectangle a is smaller than that of rectangle b.
+    ///         +1 if the area of rectangle a is larger than that of rectangle b.
+    ///          0 if the rectangles have the same area.
+    inline int operator()(rectq_t const *pq, size_t const w, size_t const h, size_t const b) const
+    {
+        size_t const A = w * h;
+        size_t const B = pq->Width[b]  * pq->Height[b];
+        return (A < B) ? -1 : ((A > B) ? +1 : 0);
+    }
+};
+
+/// @summary A functor type used for ordering rectangles into descending order by area.
+struct rectq_maxa_t
+{
+    /// @summary The function operator. Compares two rectangle values.
+    /// @param pq The rectangle priority queue being heapified.
+    /// @param a The zero-based index of the first rectangle.
+    /// @param b The zero-based index of the second rectangle.
+    /// @return -1 if the area of rectangle a is larger than that of rectangle b.
+    ///         +1 if the area of rectangle a is smaller than that of rectangle b.
+    ///          0 if the rectangles have the same width.
+    inline int operator()(rectq_t const *pq, size_t const a, size_t const b) const
+    {
+        size_t const A = pq->Width[a]  * pq->Height[a];
+        size_t const B = pq->Width[b]  * pq->Height[b];
+        return (A < B) ? +1 : ((A > B) ? -1 : 0);
+    }
+    /// @summary The function operator. Compares two rectangle values.
+    /// @param pq The rectangle priority queue being heapified.
+    /// @param w The width of the rectangle being inserted.
+    /// @param h The height of the rectangle being inserted.
+    /// @param b The zero-based index of the second rectangle.
+    /// @return -1 if the area of rectangle a is larger than that of rectangle b.
+    ///         +1 if the area of rectangle a is smaller than that of rectangle b.
+    ///          0 if the rectangles have the same width.
+    inline int operator()(rectq_t const *pq, size_t const w, size_t const h, size_t const b) const
+    {
+        size_t const A = w * h;
+        size_t const B = pq->Width[b]  * pq->Height[b];
+        return (A < B) ? +1 : ((A > B) ? -1 : 0);
+    }
+};
 
 /*///////////////////////
 //   Local Functions   //
 ///////////////////////*/
+/// @summary Mixes the bits of a 32-bit unsigned integer.
+/// @param value The input value.
+/// @return The output value.
+static inline uint32_t hash_u32(uint32_t value)
+{
+    value ^= value >> 16;
+    value *= 0x85EBCA6B;
+    value ^= value >> 13;
+    value *= 0xC2B2AE35;
+    value ^= value >> 16;
+    return value;
+}
+
+/// @summary Resets a rectangle priority queue to empty without allocating or freeing storage.
+/// @param pq The rectangle priority queue to clear.
+static inline void rectq_clear(rectq_t *pq)
+{
+    pq->Count = 0;
+}
+
+/// @summary Allocates storage for a rectangle priority queue and initializes the queue to empty.
+/// @param pq The priority queue structure to initialize.
+/// @param capacity The maximum number of items to be inserted into the queue.
+/// @return true if the queue was initialized successfully.
+static bool create_rectq(rectq_t *pq, size_t capacity)
+{
+    if (pq != NULL)
+    {
+        pq->Count  = 0;
+        pq->Index  = NULL;
+        pq->Width  = NULL;
+        pq->Height = NULL;
+        if (capacity > 0)
+        {   // allocate storage as one large contiguous block.
+            size_t n = capacity * 3;
+            void  *p = malloc(n * sizeof(size_t));
+            if (p != NULL)
+            {
+                pq->Index  = ((size_t*) p + (0));
+                pq->Width  = ((size_t*) p + (capacity));
+                pq->Height = ((size_t*) p + (capacity * 2));
+                return true;
+            }
+            else return false;
+        }
+        else return true;
+    }
+    else return false;
+}
+
+/// @summary Frees storage associated with a rectangle priority queue.
+/// @param pq The rectangle priority queue to delete.
+static void delete_rectq(rectq_t *pq)
+{
+    if (pq != NULL)
+    {
+        pq->Count = 0;
+        if (pq->Index != NULL)
+        {   // all storage was allocated as a single contiguous block.
+            // the base pointer is stored in pq->Index.
+            free(pq->Index);
+        }
+        pq->Index  = NULL;
+        pq->Width  = NULL;
+        pq->Height = NULL;
+    }
+}
+
+/// @summary Inserts an item into a priority queue.
+/// @param pq The priority queue to update.
+/// @param w The horizontal extent of the rectangle.
+/// @param h The vertical extent of the rectangle.
+/// @param i The unique identifier of the rectangle.
+/// @param cmp Provides int operator()(rectq_t *pq, size_t const w, size_t const h, size_t const b) const
+/// and returns -1:0:+1 to order items within the queue.
+template <typename Comp>
+static inline void rectq_insert(rectq_t *pq, size_t w, size_t h, size_t i, Comp const &cmp)
+{
+    size_t pos = pq->Count++;
+    size_t idx =(pos - 1) / 2;
+    while (pos > 0 && cmp(pq, w, h, idx) < 0)
+    {
+        pq->Index [pos] = pq->Index [idx];
+        pq->Width [pos] = pq->Width [idx];
+        pq->Height[pos] = pq->Height[idx];
+        pos = idx;
+        idx =(idx - 1) / 2;
+    }
+    pq->Index [pos] = i;
+    pq->Width [pos] = w;
+    pq->Height[pos] = h;
+}
+
+/// @summary Removes the highest priority item from the queue.
+/// @param pq The priority queue to update.
+/// @param w On return, stores the horizontal extent of the removed rectangle.
+/// @param h On return, stores the vertical extent of the removed rectangle.
+/// @param i On return, stores the unique identifier of the removed rectangle.
+/// @param cmp Provides int operator()(rectq_t *pq, size_t const a, size_t const b) const
+/// and returns -1:0:+1 to order items within the queue.
+template <typename Comp>
+static inline void rectq_remove(rectq_t *pq, size_t &w, size_t &h, size_t &i, Comp const &cmp)
+{   // the highest-priority item is located at index 0.
+    i = pq->Index [0];
+    w = pq->Width [0];
+    h = pq->Height[0];
+
+    // swap the last item into the position vacated by the first item.
+    size_t n      = pq->Count - 1;
+    pq->Index [0] = pq->Index [n];
+    pq->Width [0] = pq->Width [n];
+    pq->Height[0] = pq->Height[n];
+    pq->Count     = n;
+
+    // now restore the heap ordering constraint.
+    size_t pos = 0;
+    for ( ; ; )
+    {
+        size_t l = (2 * pos) + 1; // left child.
+        size_t r = (2 * pos) + 1; // right child.
+        size_t m;                 // child with highest priority.
+
+        // determine the child node with the highest priority.
+        if  (l >= n) break;       // node at pos has no children.
+        if  (r >= n) m = l;       // node at pos has no right child.
+        else m  = (cmp(pq, l, r) < 0) ? l : r;
+
+        // now compare the node at pos with the highest priority child, m.
+        if (cmp(pq, pos, m) < 0)
+        {   // children have lower priority than parent; order restored.
+            break;
+        }
+
+        // swap the parent with the largest child.
+        size_t temp_i   = pq->Index [pos];
+        size_t temp_w   = pq->Width [pos];
+        size_t temp_h   = pq->Height[pos];
+        pq->Index [pos] = pq->Index [m];
+        pq->Width [pos] = pq->Width [m];
+        pq->Height[pos] = pq->Height[m];
+        pq->Index [m]   = temp_i;
+        pq->Width [m]   = temp_w;
+        pq->Height[m]   = temp_h;
+        pos = m;
+    }
+}
+
+/// @summary Calculates the total area used by a set of rectangles.
+/// @param n The number of rectangles and dimension of the width and height arrays.
+/// @param w An array of n rectangle width values.
+/// @param h An array of n rectangle height values.
+/// @param hpad The padding along the horizontal edges of each rectangle.
+/// @param vpad The padding along the vertical edges of each rectangle.
+/// @return The total area required for all rectangles.
+static size_t total_area(size_t n, size_t const *w, size_t const *h, size_t hpad, size_t vpad)
+{
+    size_t area   = 0;
+    for (size_t i = 0; i < n; ++i)
+    {
+        size_t const width  = w[i] + (2 * hpad);
+        size_t const height = h[i] + (2 * vpad);
+        area += (width * height);
+    }
+    return area;
+}
+
+/// @summary Determine the largest value in an array of values.
+/// @param n The number of values in the array to search.
+/// @param v The array of values to search.
+/// @return The largest value in the search array.
+static size_t max_value(size_t n, size_t const *v)
+{
+    size_t x =  0;
+    for (size_t i = 0; i < n; ++i)
+    {
+        if (x < v[i])
+            x = v[i];
+    }
+    return x;
+}
+
 /// @summary Attempt to find a node that can contain the given area within the
 /// rectangle packer binary tree, performing any necessary spatial subdivision.
 /// @param p The rectangle packer being updated.
@@ -707,174 +1082,401 @@ void r2d::set_atlas_entry_frame(r2d::atlas_entry_t *ent, size_t frame_index, siz
     ent->Frames [frame_index] = frame;
 }
 
-bool r2d::create_image_cache(r2d::image_cache_t *cache, r2d::image_cache_config_t const &config)
+bool r2d::create_atlas(r2d::atlas_t *atlas, r2d::atlas_config_t const &config)
 {
-    if (cache != NULL)
+    if (atlas != NULL)
     {
         GLint   nalign         = 4;
         GLsizei nbytes         = 0;
-        cache->PageWidth       = config.PageWidth;
-        cache->PageHeight      = config.PageHeight;
-        cache->HorizontalPad   = config.HorizontalPad;
-        cache->VerticalPad     = config.VerticalPad;
-        cache->EntryCapacity   = 0;
-        cache->EntryCount      = 0;
-        cache->EntryList       = NULL;
-        cache->PageCapacity    = 0;
-        cache->PageCount       = 0;
-        cache->TexturePages    = NULL;
-        cache->BucketCount     = config.ExpectedCount / IMAGE_CACHE_NAMES_PER_BUCKET;
-        cache->EntryNames      = NULL;
-        cache->PageLayout      = config.Layout;
-        cache->PageFormat      = config.Format;
-        cache->PageDataType    = config.DataType;
-        cache->TransferBuffer  = 0;
-        cache->TransferBytes   = 0;
-        cache->BufferOffset    = 0;
-        if (cache->BucketCount < IMAGE_CACHE_MIN_BUCKET_COUNT)
-            cache->BucketCount = IMAGE_CACHE_MIN_BUCKET_COUNT;
+        atlas->PageWidth       = config.PageWidth;
+        atlas->PageHeight      = config.PageHeight;
+        atlas->HorizontalPad   = config.HorizontalPad;
+        atlas->VerticalPad     = config.VerticalPad;
+        atlas->EntryCapacity   = 0;
+        atlas->EntryCount      = 0;
+        atlas->EntryList       = NULL;
+        atlas->PageCapacity    = 0;
+        atlas->PageCount       = 0;
+        atlas->TexturePages    = NULL;
+        atlas->BucketCount     = config.ExpectedCount / ATLAS_NAMES_PER_BUCKET;
+        atlas->BucketList      = NULL;
+        atlas->EntryNames      = NULL;
+        atlas->EntryIndices    = NULL;
+        atlas->PageLayout      = config.Layout;
+        atlas->PageFormat      = config.Format;
+        atlas->PageDataType    = config.DataType;
+        atlas->TransferBuffer  = 0;
+        atlas->TransferBytes   = 0;
+        atlas->BufferOffset    = 0;
+        if (atlas->BucketCount < ATLAS_MIN_BUCKET_COUNT)
+            atlas->BucketCount = ATLAS_MIN_BUCKET_COUNT;
 
         // pre-allocate storage for the entry lookup-by-name table.
-        cache->EntryNames      = (uint32_t**) malloc(cache->BucketCount * sizeof(uint32_t*));
-        if (cache->EntryNames == NULL) goto error_cleanup;
-        for (size_t i = 0; i < cache->BucketCount; ++i)
+        atlas->BucketList        = (r2d::bucket_t*) malloc(atlas->BucketCount * sizeof(r2d::bucket_t));
+        atlas->EntryNames        = (uint32_t    **) malloc(atlas->BucketCount * sizeof(uint32_t*));
+        atlas->EntryIndices      = (uint32_t    **) malloc(atlas->BucketCount * sizeof(uint32_t*));
+        if (atlas->BucketList   == NULL) goto error_cleanup;
+        if (atlas->EntryNames   == NULL) goto error_cleanup;
+        if (atlas->EntryIndices == NULL) goto error_cleanup;
+        for (size_t i = 0; i < atlas->BucketCount; ++i)
         {
-            cache->EntryNames[i]     = (uint32_t*) malloc((IMAGE_CACHE_NAMES_PER_BUCKET + 2) * sizeof(uint32_t));
-            if (cache->EntryNames[i] == NULL)
-                goto error_cleanup;
-            cache->EntryNames[i][0]  = IMAGE_CACHE_NAMES_PER_BUCKET; // capacity
-            cache->EntryNames[i][1]  = 0;                            // count
+            atlas->BucketList[i].Capacity = ATLAS_NAMES_PER_BUCKET;
+            atlas->BucketList[i].Count    = 0;
+            atlas->EntryNames[i]          = (uint32_t*) malloc(ATLAS_NAMES_PER_BUCKET * sizeof(uint32_t));
+            atlas->EntryIndices[i]        = (uint32_t*) malloc(ATLAS_NAMES_PER_BUCKET * sizeof(uint32_t));
+            if (atlas->EntryNames[i]   == NULL) goto error_cleanup;
+            if (atlas->EntryIndices[i] == NULL) goto error_cleanup;
         }
 
         // pre-allocate storage for the entry list.
         if (config.ExpectedCount > 0)
         {
-            cache->EntryCapacity = config.ExpectedCount;
-            cache->EntryCount    = 0;
-            cache->EntryList     = (r2d::atlas_entry_t*) malloc(config.ExpectedCount * sizeof(r2d::atlas_entry_t));
-            if (cache->EntryList == NULL) goto error_cleanup;
+            atlas->EntryCapacity = config.ExpectedCount;
+            atlas->EntryCount    = 0;
+            atlas->EntryList     = (r2d::atlas_entry_t*) malloc(config.ExpectedCount * sizeof(r2d::atlas_entry_t));
+            if (atlas->EntryList == NULL) goto error_cleanup;
         }
 
-        // pre-allocate storage for page texture IDs.
-        cache->TexturePages = (GLuint*) malloc(IMAGE_CACHE_PAGE_CAPACITY * sizeof(GLuint));
-        if (cache->TexturePages == NULL) goto error_cleanup;
-        cache->PageCapacity = IMAGE_CACHE_PAGE_CAPACITY;
-        cache->PageCount    = 0;
+        // pre-allocate storage for texture page packers and page texture IDs.
+        atlas->PagePackers  = (r2d::packer_t*) malloc(ATLAS_PAGE_CAPACITY * sizeof(r2d::packer_t));
+        if (atlas->PagePackers == NULL)  goto error_cleanup;
+        atlas->TexturePages = (GLuint*)  malloc(ATLAS_PAGE_CAPACITY * sizeof(GLuint));
+        if (atlas->TexturePages == NULL) goto error_cleanup;
+        atlas->PageCapacity = ATLAS_PAGE_CAPACITY;
+        atlas->PageCount    = 0;
 
         // generate the PBO used to stream data to the GPU.
-        glGenBuffers(1, &cache->TransferBuffer);
-        if (cache->TransferBuffer == 0) goto error_cleanup;
-        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, cache->TransferBuffer);
+        glGenBuffers(1, &atlas->TransferBuffer);
+        if (atlas->TransferBuffer == 0) goto error_cleanup;
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, atlas->TransferBuffer);
         glGetIntegerv(GL_UNPACK_ALIGNMENT , &nalign);
         nbytes = gl::bytes_per_slice(config.Format, config.DataType, config.PageWidth, config.PageHeight, size_t(nalign));
         glBufferData(GL_PIXEL_UNPACK_BUFFER, nbytes, NULL, GL_STREAM_DRAW);
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
-        cache->TransferBytes = size_t(nbytes);
-        cache->BufferOffset  = 0;
+        atlas->TransferBytes = size_t(nbytes);
+        atlas->BufferOffset  = 0;
         return true;
 
 error_cleanup:
-        if (cache->TransferBuffer != 0)
+        if (atlas->TransferBuffer != 0)
         {
             glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
-            glDeleteBuffers(1, &cache->TransferBuffer);
+            glDeleteBuffers(1, &atlas->TransferBuffer);
         }
-        if (cache->TexturePages != NULL)
+        if (atlas->TexturePages != NULL)  free(atlas->TexturePages);
+        if (atlas->PagePackers != NULL)   free(atlas->PagePackers);
+        if (atlas->EntryList != NULL)     free(atlas->EntryList);
+        if (atlas->EntryIndices != NULL)
         {
-            free(cache->TexturePages);
-        }
-        if (cache->EntryNames != NULL)
-        {
-            for (size_t i = 0; i < cache->BucketCount; ++i)
+            for (size_t i = 0; i < atlas->BucketCount; ++i)
             {
-                if (cache->EntryNames[i] != NULL)
+                if (atlas->EntryIndices[i] != NULL)
                 {
-                    free(cache->EntryNames[i]);
-                    cache->EntryNames[i]  = NULL;
+                    free(atlas->EntryIndices[i]);
+                    atlas->EntryIndices[i]  = NULL;
                 }
             }
-            free(cache->EntryNames);
+            free(atlas->EntryIndices);
         }
-        if (cache->EntryList != NULL)
+        if (atlas->EntryNames != NULL)
         {
-            free(cache->EntryList);
+            for (size_t i = 0; i < atlas->BucketCount; ++i)
+            {
+                if (atlas->EntryNames[i] != NULL)
+                {
+                    free(atlas->EntryNames[i]);
+                    atlas->EntryNames[i]  = NULL;
+                }
+            }
+            free(atlas->EntryNames);
         }
-        cache->EntryCapacity  = 0;
-        cache->EntryCount     = 0;
-        cache->EntryList      = NULL;
-        cache->PageCapacity   = 0;
-        cache->PageCount      = 0;
-        cache->TexturePages   = NULL;
-        cache->BucketCount    = 0;
-        cache->EntryNames     = NULL;
-        cache->TransferBuffer = 0;
-        cache->TransferBytes  = 0;
-        cache->BufferOffset   = 0;
+        if (atlas->BucketList != NULL)
+        {
+            free(atlas->BucketList);
+        }
+        atlas->EntryCapacity  = 0;
+        atlas->EntryCount     = 0;
+        atlas->EntryList      = NULL;
+        atlas->PageCapacity   = 0;
+        atlas->PageCount      = 0;
+        atlas->PagePackers    = NULL;
+        atlas->TexturePages   = NULL;
+        atlas->BucketCount    = 0;
+        atlas->BucketList     = NULL;
+        atlas->EntryNames     = NULL;
+        atlas->EntryIndices   = NULL;
+        atlas->TransferBuffer = 0;
+        atlas->TransferBytes  = 0;
+        atlas->BufferOffset   = 0;
         return false;
     }
     else return false;
 }
 
-void r2d::delete_image_cache(r2d::image_cache_t *cache)
+void r2d::delete_atlas(r2d::atlas_t *atlas)
 {
-    if (cache != NULL)
+    if (atlas != NULL)
     {
-        if (cache->TransferBuffer != 0)
-        {   // if the buffer is in use, it will be 
+        if (atlas->TransferBuffer != 0)
+        {   // if the buffer is in use, it will be
             // deleted when the GPU is finished with it.
-            glDeleteBuffers(1, &cache->TransferBuffer);
+            glDeleteBuffers(1, &atlas->TransferBuffer);
         }
-        if (cache->TexturePages != NULL)
+        if (atlas->TexturePages != NULL)
         {
-            if (cache->PageCount > 0)
+            if (atlas->PageCount > 0)
             {   // any textures in use will be deleted when the GPU is done with them.
-                glDeleteTextures(GLsizei(cache->PageCount), cache->TexturePages);
+                glDeleteTextures(GLsizei(atlas->PageCount), atlas->TexturePages);
             }
-            free(cache->TexturePages);
+            free(atlas->TexturePages);
         }
-        if (cache->EntryNames != NULL)
+        if (atlas->PagePackers != NULL)
         {
-            for (size_t i = 0; i < cache->BucketCount; ++i)
+            for (size_t i = 0; i < atlas->PageCount; ++i)
             {
-                if (cache->EntryNames[i] != NULL)
+                r2d::delete_packer(&atlas->PagePackers[i]);
+            }
+            free(atlas->PagePackers);
+        }
+        if (atlas->EntryList != NULL)
+        {
+            free(atlas->EntryList);
+        }
+        if (atlas->EntryIndices != NULL)
+        {
+            for (size_t i = 0; i < atlas->BucketCount; ++i)
+            {
+                if (atlas->EntryIndices[i] != NULL)
                 {
-                    free(cache->EntryNames[i]);
-                    cache->EntryNames[i]  = NULL;
+                    free(atlas->EntryIndices[i]);
+                    atlas->EntryIndices[i]  = NULL;
                 }
             }
-            free(cache->EntryNames);
+            free(atlas->EntryIndices);
         }
-        if (cache->EntryList != NULL)
+        if (atlas->EntryNames != NULL)
         {
-            free(cache->EntryList);
+            for (size_t i = 0; i < atlas->BucketCount; ++i)
+            {
+                if (atlas->EntryNames[i] != NULL)
+                {
+                    free(atlas->EntryNames[i]);
+                    atlas->EntryNames[i]  = NULL;
+                }
+            }
+            free(atlas->EntryNames);
         }
-        cache->EntryCapacity  = 0;
-        cache->EntryCount     = 0;
-        cache->EntryList      = NULL;
-        cache->PageCapacity   = 0;
-        cache->PageCount      = 0;
-        cache->TexturePages   = NULL;
-        cache->BucketCount    = 0;
-        cache->EntryNames     = NULL;
-        cache->TransferBuffer = 0;
-        cache->TransferBytes  = 0;
-        cache->BufferOffset   = 0;
+        if (atlas->BucketList != NULL)
+        {
+            free(atlas->BucketList);
+        }
+        atlas->EntryCapacity     = 0;
+        atlas->EntryCount        = 0;
+        atlas->EntryList         = NULL;
+        atlas->PageCapacity      = 0;
+        atlas->PageCount         = 0;
+        atlas->PagePackers       = NULL;
+        atlas->TexturePages      = NULL;
+        atlas->BucketCount       = 0;
+        atlas->BucketList        = NULL;
+        atlas->EntryNames        = NULL;
+        atlas->EntryIndices      = NULL;
+        atlas->TransferBuffer    = 0;
+        atlas->TransferBytes     = 0;
+        atlas->BufferOffset      = 0;
     }
 }
 
-void r2d::freeze_image_cache(r2d::image_cache_t *cache)
+void r2d::freeze_atlas(r2d::atlas_t *atlas)
 {
-    if (cache->TransferBuffer != 0)
+    if (atlas->TransferBuffer != 0)
     {
-        glDeleteBuffers(1, &cache->TransferBuffer);
-        cache->TransferBuffer  = 0;
-        cache->TransferBytes   = 0;
-        cache->BufferOffset    = 0;
+        glDeleteBuffers(1, &atlas->TransferBuffer);
+        atlas->TransferBuffer  = 0;
+        atlas->TransferBytes   = 0;
+        atlas->BufferOffset    = 0;
+    }
+    if (atlas->PagePackers != NULL)
+    {
+        for (size_t i = 0; i < atlas->PageCount; ++i)
+        {
+            r2d::delete_packer(&atlas->PagePackers[i]);
+        }
+        free(atlas->PagePackers);
+        atlas->PagePackers = NULL;
     }
 }
 
+r2d::atlas_entry_t* r2d::find_atlas_entry(r2d::atlas_t *atlas, uint32_t name)
+{
+    size_t   const  bucket_index = hash_u32(name)  % atlas->BucketCount;
+    size_t   const  bucket_size  = atlas->BucketList[bucket_index].Count;
+    uint32_t const *bucket_names = atlas->EntryNames[bucket_index];
+    for (size_t  i = 0; i < bucket_size; ++i)
+    {
+        if (name == bucket_names[i])
+        {
+            uint32_t value_index = atlas->EntryIndices[bucket_index][i];
+            return &atlas->EntryList[value_index];
+        }
+    }
+    return NULL;
+}
+
+r2d::atlas_entry_t* r2d::get_atlas_entry(r2d::atlas_t *atlas, size_t index)
+{
+    return &atlas->EntryList[index];
+}
+
+r2d::atlas_entry_t* r2d::atlas_add(r2d::atlas_t *atlas, uint32_t name, size_t frame_count, size_t *out_index)
+{
+    if (atlas->EntryCount == atlas->EntryCapacity)
+    {   // grow storage for the entry definitions.
+        size_t newc = atlas->EntryCapacity > 4096 ? atlas->EntryCapacity + 512 : atlas->EntryCapacity * 2;
+        void  *newl = realloc(atlas->EntryList, newc * sizeof(r2d::atlas_entry_t));
+        if (newl != NULL)
+        {
+            atlas->EntryCapacity = newc;
+            atlas->EntryList     = (r2d::atlas_entry_t*) newl;
+        }
+        else return NULL;
+    }
+
+    size_t const entry_id  = atlas->EntryCount;
+    size_t const bucket_id = hash_u32(name) % atlas->BucketCount;
+    size_t const bucket_n  = atlas->BucketList[bucket_id].Count;
+    if (bucket_n == atlas->BucketList[bucket_id].Capacity)
+    {   // grow storage for the entry name lookup table.
+        size_t newc = bucket_n + 32;
+        void  *newn = realloc(atlas->EntryNames  [bucket_id], newc * sizeof(uint32_t));
+        void  *newi = realloc(atlas->EntryIndices[bucket_id], newc * sizeof(uint32_t));
+        if (newn != NULL) atlas->EntryNames  [bucket_id]   = (uint32_t*) newn;
+        if (newi != NULL) atlas->EntryIndices[bucket_id]   = (uint32_t*) newi;
+        if (newn != NULL && newi != NULL) atlas->BucketList[bucket_id].Capacity = newc;
+        else return NULL;
+    }
+
+    r2d::atlas_entry_t *e = &atlas->EntryList[entry_id];
+    if (!r2d::create_atlas_entry(e, name , frame_count))
+    {   // failed to allocate storage for frame data for the entry.
+        return NULL;
+    }
+    if (out_index) *out_index = entry_id;
+
+    size_t const  idx = atlas->BucketList[bucket_id].Count;
+    atlas->EntryNames  [bucket_id][idx] = name;
+    atlas->EntryIndices[bucket_id][idx] = uint32_t(entry_id);
+    atlas->BucketList  [bucket_id].Count++;
+    atlas->EntryCount++;
+    return e;
+}
+
+bool r2d::atlas_place_frame(r2d::atlas_t *atlas, r2d::atlas_entry_t *entry, size_t frame, size_t w, size_t h)
+{
+    return r2d::atlas_place_frame(atlas, entry, frame, w, h, atlas->HorizontalPad, atlas->VerticalPad);
+}
+
+bool r2d::atlas_place_frame(r2d::atlas_t *atlas, r2d::atlas_entry_t *entry, size_t frame, size_t w, size_t h, size_t hpad, size_t vpad)
+{
+    size_t frame_width  = w + (hpad * 2);
+    size_t frame_height = h + (vpad * 2);
+
+    if (frame_width > atlas->PageWidth || frame_height > atlas->PageHeight)
+    {   // no texture page can be large enough to hold this frame.
+        return false;
+    }
+    if (atlas->PagePackers == NULL)
+    {   // the atlas has been frozen, no data can be added.
+        return false;
+    }
+
+    size_t const nump = atlas->PageCount;
+    size_t page_index = nump - 1;
+    while (page_index < nump)
+    {
+        r2d::pkrect_t   rect;
+        r2d::packer_t  *pack = &atlas->PagePackers[page_index];
+        if (r2d::packer_insert(pack, w, h, hpad, vpad, entry->Name, &rect))
+        {   // the frame was successfully placed on this page.
+            // note that rect is the unpadded content rectangle.
+            r2d::atlas_frame_t  eframe = {
+                rect.X,
+                rect.Y,
+                rect.Width,
+                rect.Height
+            };
+            r2d::set_atlas_entry_frame(entry, frame, page_index, eframe);
+            return true;
+        }
+        // decrement at page_index = 0 will cause wrap-around.
+        // page_index in this case will then be > npages.
+        page_index--;
+    }
+
+    // we were unable to find a page on which to place the frame, so allocate a new page.
+    if (atlas->PageCount == atlas->PageCapacity)
+    {   // allocate additional storage. we'll initialize as-needed.
+        size_t newc = atlas->PageCapacity + ATLAS_PAGE_CAPACITY;
+        void  *newp = realloc(atlas->PagePackers , newc * sizeof(r2d::packer_t));
+        void  *newt = realloc(atlas->TexturePages, newc * sizeof(GLuint));
+        if (newp != NULL) atlas->PagePackers  = (r2d::packer_t*) newp;
+        if (newt != NULL) atlas->TexturePages = (GLuint*) newt;
+        if (newp != NULL && newt != NULL) atlas->PageCapacity = newc;
+    }
+
+    size_t const page_width  = atlas->PageWidth;
+    size_t const page_height = atlas->PageHeight;
+    size_t const page_id     = atlas->PageCount;
+
+    // create texture storage for the new texture page.
+    GLuint tex  = 0;
+    glGenTextures(1, &tex);
+    if (tex == 0) return false;
+    glBindTexture(GL_TEXTURE_2D, tex);
+    gl::texture_storage(GL_TEXTURE_2D, atlas->PageFormat, atlas->PageDataType, GL_CLAMP_TO_EDGE , GL_CLAMP_TO_EDGE, page_width, page_height, 1, 1);
+
+    // initialize a new rectangle packer for placing sub-images.
+    if (!r2d::create_packer(&atlas->PagePackers[page_id], page_width, page_height, ATLAS_DEFAULT_CAPACITY))
+    {   // unable to initialize the packer, so delete the texture page.
+        glBindTexture(GL_TEXTURE_2D, 0);
+        glDeleteTextures(1, &tex);
+        return false;
+    }
+
+    r2d::pkrect_t  rect;
+    r2d::packer_t *pack = &atlas->PagePackers[page_id];
+    r2d::packer_insert(pack, w, h, hpad, vpad, entry->Name, &rect);
+    r2d::atlas_frame_t eframe = { rect.X, rect.Y, rect.Width, rect.Height };
+    r2d::set_atlas_entry_frame(entry, frame, page_id, eframe);
+    atlas->TexturePages[page_id] = tex;
+    atlas->PageCount++;
+    return true;
+}
+
+/*
+bool r2d::atlas_transfer_frame(r2d::atlas_t *atlas, r2d::atlas_entry_t *entry, size_t frame, void const *pixels)
+{
+    r2d::atlas_frame_t &f = entry->Frames[frame];
+    GLintptr            o = atlas->BufferOffset;
+    GLbitfield          a = GL_MAP_WRITE_BIT;
+    GLsizei             n = gl::bytes_per_slice(
+    void               *p = NULL;
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, atlas->TransferBuffer);
+    p = glMapBufferRange(GL_PIXEL_UNPACK_BUFFER, o, n, a);
+}
+
+        glGenBuffers(1, &atlas->TransferBuffer);
+        if (atlas->TransferBuffer == 0) goto error_cleanup;
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, atlas->TransferBuffer);
+        glGetIntegerv(GL_UNPACK_ALIGNMENT , &nalign);
+        nbytes = gl::bytes_per_slice(config.Format, config.DataType, config.PageWidth, config.PageHeight, size_t(nalign));
+        glBufferData(GL_PIXEL_UNPACK_BUFFER, nbytes, NULL, GL_STREAM_DRAW);
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+        atlas->TransferBytes = size_t(nbytes);
+        atlas->BufferOffset  = 0;
 // use glMapBufferRange at cache->BufferOffset, for gl::bytes_per_slice(image_to_copy),
-// memcpy the entire source data to the PBO, glUnmapBuffer, and then glTexSubImage2D 
-// (via the gl::pixel_transfer_h2d() function) to queue the async upload. if not 
+// memcpy the entire source data to the PBO, glUnmapBuffer, and then glTexSubImage2D
+// (via the gl::pixel_transfer_h2d() function) to queue the async upload. if not
 // enough buffer space, map with discard.
+*/
 
