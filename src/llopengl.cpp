@@ -1396,6 +1396,7 @@ void gl::texture_storage(
                 break;
 
             case GL_TEXTURE_2D_ARRAY:
+            case GL_TEXTURE_CUBE_MAP_ARRAY:
                 {
                     // 2D array texture specify slice_count as the number of
                     // items; the number of items is not decreased with LOD.
@@ -1455,6 +1456,7 @@ void gl::transfer_pixels_d2h(gl::pixel_transfer_d2h_t *transfer)
             case GL_TEXTURE_1D:
             case GL_TEXTURE_2D:
             case GL_TEXTURE_3D:
+            case GL_TEXTURE_CUBE_MAP_ARRAY:
             case GL_TEXTURE_CUBE_MAP_POSITIVE_X:
             case GL_TEXTURE_CUBE_MAP_NEGATIVE_X:
             case GL_TEXTURE_CUBE_MAP_POSITIVE_Y:
@@ -1496,6 +1498,7 @@ void gl::transfer_pixels_d2h(gl::pixel_transfer_d2h_t *transfer)
             case GL_TEXTURE_1D_ARRAY:
             case GL_TEXTURE_2D_ARRAY:
             case GL_TEXTURE_RECTANGLE:
+            case GL_TEXTURE_CUBE_MAP_ARRAY:
             case GL_TEXTURE_CUBE_MAP_POSITIVE_X:
             case GL_TEXTURE_CUBE_MAP_NEGATIVE_X:
             case GL_TEXTURE_CUBE_MAP_POSITIVE_Y:
@@ -1600,6 +1603,7 @@ void gl::transfer_pixels_h2d(gl::pixel_transfer_h2d_t *transfer)
 
             case GL_TEXTURE_3D:
             case GL_TEXTURE_2D_ARRAY:
+            case GL_TEXTURE_CUBE_MAP_ARRAY:
                 {
                     glCompressedTexSubImage3D(
                         transfer->Target,
@@ -1660,6 +1664,7 @@ void gl::transfer_pixels_h2d(gl::pixel_transfer_h2d_t *transfer)
 
             case GL_TEXTURE_3D:
             case GL_TEXTURE_2D_ARRAY:
+            case GL_TEXTURE_CUBE_MAP_ARRAY:
                 {
                     glTexSubImage3D(
                         transfer->Target,
