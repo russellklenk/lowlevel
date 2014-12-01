@@ -200,6 +200,19 @@ struct atlas_t
 /// @return true if the input format could be mapped to OpenGL.
 GLDRAW2D_PUBLIC bool dxgi_format_to_gl(uint32_t dxgi, GLenum &out_internalformat, GLenum &out_format, GLenum &out_datatype);
 
+/// @summary Given a chunk of data representing a DDS file, parse the data and
+/// upload it into a new OpenGL texture object.
+/// @param data A blob of data representing a DDS-formatted image.
+/// @param data_size The maximum number of bytes to read from the DDS data.
+/// @param out_levels On return, this address points to an array of descriptions
+/// of the levels in the mipmap chain described in the DDS file. This array is
+/// allocated using the standard C library malloc() function. The caller is
+/// responsible for freeing the returned array using the free() function.
+/// @param out_count On return, stores the number if items in the levels array.
+/// @param out_texId On return, stores the OpenGL texture object ID.
+/// @return true if the DDS was successfully loaded into the OpenGL texture.
+GLDRAW2D_PUBLIC bool load_dds(void const *dds_data, size_t dds_size, gl::level_desc_t **out_levels, size_t *out_count, GLuint *out_texId);
+
 /// @summary Initializes an packer for dynamically packing several rectangles
 /// representing images onto a single, larger rectangle.
 /// @param packer The rectangle packer to initialize.

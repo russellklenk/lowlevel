@@ -918,6 +918,177 @@ bool r2d::dxgi_format_to_gl(uint32_t dxgi, GLenum &out_internalformat, GLenum &o
     return false;
 }
 
+bool r2d::load_dds(void const *dds_data, size_t dds_size, gl::level_desc_t **out_levels, size_t *out_count, GLuint *out_texId)
+{
+    size_t                    count     =  0;
+    size_t                   nexpect    =  0;
+    size_t                   nitems     =  0;
+    size_t                   nlevels    =  0;
+    data::dds_level_desc_t   *levels    = NULL;
+    data::dds_header_dxt10_t *h_ex      = NULL;
+    data::dds_header_t        header    = {0};
+    data::dds_header_dxt10_t  header_ex = {0};
+    gl::level_desc_t         *gldesc    = NULL;
+
+    if (!data::dds_header(dds_data, dds_size, &header))
+    {   // the DDS file doesn't contain the necessary header.
+        if (out_levels) *out_levels = NULL;
+        if (out_count ) *out_count  = 0;
+        if (out_texId ) *out_texId  = 0;
+        return false;
+    }
+    if (data::dds_header_dxt10(dds_data, dds_size, &header_ex))
+    {   // the DDS DX10 header is optional.
+        h_ex = &header_ex;
+    }
+    nitems   = data::dds_array_count(&header, h_ex);
+    nlevels  = data::dds_level_count(&header, h_ex);
+    nexpect  = nitems * nlevels;
+    if (nitems == 0  && nlevels == 0)
+    {   // the DDS file must contain at least one surface.
+        if (out_levels) *out_levels = NULL;
+        if (out_count ) *out_count  = 0;
+        if (out_texId ) *out_texId  = 0;
+        return false;
+    }
+
+    // allocate memory for the level descriptions returned to the user.
+    gldesc = (gl::level_desc_t*) malloc(nexpect * sizeof(gl::level_desc_t));
+    if (gldesc == NULL)
+    {   // unable to allocate the required memory.
+        if (out_levels) *out_levels = NULL;
+        if (out_count ) *out_count  = 0;
+        if (out_texId ) *out_texId  = 0;
+        return false;
+    }
+
+    // parse the remainder of the DDS file and describe the surfaces it contains.
+    levels = (data::dds_level_desc_t*) malloc(nexpect * sizeof(data::dds_level_desc_t));
+    count  =  data::dds_describe(dds_data, dds_size, &header, h_ex, levels, nexpect);
+    if (count != nexpect)
+    {   // unable to parse all of the level descriptions.
+        if (levels != NULL) free(levels);
+        if (gldesc != NULL) free(gldesc);
+        if (out_levels) *out_levels = NULL;
+        if (out_count ) *out_count  = 0;
+        if (out_texId ) *out_texId  = 0;
+        return false;
+    }
+
+    // figure out the GL format from the DXGI format.
+    size_t width    = levels[0].Width;
+    size_t height   = levels[0].Height;
+    GLenum target   = GL_NONE;
+    GLenum format   = GL_NONE;
+    GLenum layout   = GL_NONE;
+    GLenum dataType = GL_NONE;
+    GLenum magFilter= GL_CLAMP_TO_EDGE;
+    GLenum minFilter= GL_CLAMP_TO_EDGE;
+    if (!r2d::dxgi_format_to_gl(levels[0].Format, format, layout, dataType))
+    {   // the DDS data is stored in an unsupported format.
+        if (levels != NULL) free(levels);
+        if (gldesc != NULL) free(gldesc);
+        if (out_levels) *out_levels = NULL;
+        if (out_count ) *out_count  = 0;
+        if (out_texId ) *out_texId  = 0;
+        return false;
+    }
+
+    // create the target texture object name and allocate GPU storage.
+    GLuint texId = 0;
+    glGenTextures (1, &texId);
+    if (texId  ==  0)
+    {   // unable to create the OpenGL texture object.
+        if (levels != NULL) free(levels);
+        if (gldesc != NULL) free(gldesc);
+        if (out_levels) *out_levels = NULL;
+        if (out_count ) *out_count  = 0;
+        if (out_texId ) *out_texId  = 0;
+        return false;
+    }
+
+    // figure out the 'default' texture target type. the target used by
+    // the application might be different, but we need something to upload.
+    bool isArray   = data::dds_array  (&header, h_ex);
+    bool isVolume  = data::dds_volume (&header, h_ex);
+    bool isCubemap = data::dds_cubemap(&header, h_ex);
+    if (isArray)
+    {   // note that volume arrays are not supported.
+        if (isCubemap) target = GL_TEXTURE_CUBE_MAP_ARRAY;
+        else if (width == 1 || height == 1) target = GL_TEXTURE_1D_ARRAY;
+        else target = GL_TEXTURE_2D_ARRAY;
+    }
+    else if (isVolume) target = GL_TEXTURE_3D;
+    else if (isCubemap) target = GL_TEXTURE_CUBE_MAP;
+    else if (width == 1 || height == 1) target = GL_TEXTURE_1D;
+    else target = GL_TEXTURE_2D;
+
+    // allocate GPU storage for all elements/slices and levels of the texture.
+    GLenum error = glGetError(); // clear the current error value, if any.
+    gl::texture_storage(target, format, dataType, minFilter, magFilter, width , height, nitems, nlevels);
+    error = glGetError();
+    if (error != GL_NO_ERROR)
+    {   // unable to allocate the necessary GPU resources.
+        glDeleteTextures(1, &texId);
+        if (levels != NULL) free(levels);
+        if (gldesc != NULL) free(gldesc);
+        if (out_levels) *out_levels = NULL;
+        if (out_count ) *out_count  = 0;
+        if (out_texId ) *out_texId  = 0;
+        return false;
+    }
+
+    for (size_t dds_level  = 0;  dds_level < count; ++dds_level)
+    {
+        data::dds_level_desc_t  &ddsd = levels[dds_level];
+        gl::level_desc_t        &glsd = gldesc[dds_level];
+        gl::pixel_transfer_h2d_t xfer;
+
+        // upload data to the GPU. since PBO's are not being used, this is
+        // synchronous on the CPU; the data is memcpy'd to driver memory and
+        // then transferred to the GPU.
+        xfer.Target            = target;
+        xfer.Format            = format;
+        xfer.DataType          = dataType;
+        xfer.UnpackBuffer      = 0;
+        xfer.TargetIndex       = ddsd.Index;          // target mipmap level.
+        xfer.TargetX           = 0;
+        xfer.TargetY           = 0;
+        xfer.TargetZ           = dds_level / nlevels; // target array slice.
+        xfer.SourceX           = 0;
+        xfer.SourceY           = 0;
+        xfer.SourceZ           = 0;
+        xfer.SourceWidth       = ddsd.Width;
+        xfer.SourceHeight      = ddsd.Height;
+        xfer.TransferWidth     = ddsd.Width;
+        xfer.TransferHeight    = ddsd.Height;
+        xfer.TransferSlices    = ddsd.Slices;
+        xfer.TransferSize      = ddsd.DataSize;
+        xfer.TransferBuffer    = ddsd.LevelData;
+        gl::transfer_pixels_h2d(&xfer);
+
+        // convert the level description to the GL format.
+        glsd.Index             = ddsd.Index;
+        glsd.Width             = ddsd.Width;
+        glsd.Height            = ddsd.Height;
+        glsd.Slices            = ddsd.Slices;
+        glsd.BytesPerElement   = ddsd.BytesPerElement;
+        glsd.BytesPerRow       = ddsd.BytesPerRow;
+        glsd.BytesPerSlice     = ddsd.BytesPerSlice;
+        glsd.Layout            = layout;
+        glsd.Format            = format;
+        glsd.DataType          = dataType;
+    }
+
+    // cleanup and set output parameters; we're done.
+    if (out_levels) *out_levels = gldesc;
+    if (out_count ) *out_count  = count;
+    if (out_texId ) *out_texId  = texId;
+    free(levels);
+    return true;
+}
+
+
 bool r2d::create_packer(r2d::packer_t *packer, size_t width, size_t height, size_t capacity)
 {
     if (packer != NULL)
