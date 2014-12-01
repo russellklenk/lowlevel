@@ -1512,30 +1512,3 @@ bool r2d::atlas_transfer_frame(r2d::atlas_t *atlas, r2d::atlas_entry_t *entry, s
     else return false;
 }
 
-/*
-bool r2d::atlas_transfer_frame(r2d::atlas_t *atlas, r2d::atlas_entry_t *entry, size_t frame, void const *pixels)
-{
-    r2d::atlas_frame_t &f = entry->Frames[frame];
-    GLintptr            o = atlas->BufferOffset;
-    GLbitfield          a = GL_MAP_WRITE_BIT;
-    GLsizei             n = gl::bytes_per_slice(
-    void               *p = NULL;
-    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, atlas->TransferBuffer);
-    p = glMapBufferRange(GL_PIXEL_UNPACK_BUFFER, o, n, a);
-}
-
-        glGenBuffers(1, &atlas->TransferBuffer);
-        if (atlas->TransferBuffer == 0) goto error_cleanup;
-        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, atlas->TransferBuffer);
-        glGetIntegerv(GL_UNPACK_ALIGNMENT , &nalign);
-        nbytes = gl::bytes_per_slice(config.Format, config.DataType, config.PageWidth, config.PageHeight, size_t(nalign));
-        glBufferData(GL_PIXEL_UNPACK_BUFFER, nbytes, NULL, GL_STREAM_DRAW);
-        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
-        atlas->TransferBytes = size_t(nbytes);
-        atlas->BufferOffset  = 0;
-// use glMapBufferRange at cache->BufferOffset, for gl::bytes_per_slice(image_to_copy),
-// memcpy the entire source data to the PBO, glUnmapBuffer, and then glTexSubImage2D
-// (via the gl::pixel_transfer_h2d() function) to queue the async upload. if not
-// enough buffer space, map with discard.
-*/
-
