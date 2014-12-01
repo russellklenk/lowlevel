@@ -1499,7 +1499,7 @@ r2d::atlas_entry_t* r2d::get_atlas_entry(r2d::atlas_t *atlas, size_t index)
     return &atlas->EntryList[index];
 }
 
-r2d::atlas_entry_t* r2d::atlas_add(r2d::atlas_t *atlas, uint32_t name, size_t frame_count, size_t *out_index)
+r2d::atlas_entry_t* r2d::atlas_create_entry(r2d::atlas_t *atlas, uint32_t name, size_t frame_count, size_t *out_index)
 {
     if (atlas->EntryCount == atlas->EntryCapacity)
     {   // grow storage for the entry definitions.
@@ -1540,6 +1540,27 @@ r2d::atlas_entry_t* r2d::atlas_add(r2d::atlas_t *atlas, uint32_t name, size_t fr
     atlas->BucketList  [bucket_id].Count++;
     atlas->EntryCount++;
     return e;
+}
+
+r2d::atlas_entry_t* r2d::atlas_create_entry(r2d::atlas_t *atlas, uint32_t name, size_t frame_count, size_t const *frame_widths, size_t const *frame_heights, size_t *out_index)
+{
+    return r2d::atlas_create_entry(atlas, name, frame_count, frame_widths, frame_heights, atlas->HorizontalPad, atlas->VerticalPad, out_index);
+}
+
+r2d::atlas_entry_t* r2d::atlas_create_entry(r2d::atlas_t *atlas, uint32_t name, size_t frame_count, size_t const *frame_widths, size_t const *frame_heights, size_t hpad, size_t vpad, size_t *out_index)
+{
+    // TODO: maybe want to use this opportunity to be smarter and reduce chances
+    // for failure by pre-allocating the necessary storage instead of possibly
+    // performing multiple allocations and ending up with partially-valid state.
+    r2d::atlas_entry_t *ae = r2d::atlas_create_entry(atlas, name, frame_count, out_index);
+    if (ae != NULL)
+    {
+        for (size_t i = 0; i < frame_count; ++i)
+        {
+            r2d::atlas_place_frame(atlas, ae, i, frame_widths[i], frame_heights[i], hpad, vpad);
+        }
+    }
+    return ae;
 }
 
 bool r2d::atlas_place_frame(r2d::atlas_t *atlas, r2d::atlas_entry_t *entry, size_t frame, size_t w, size_t h)
@@ -1626,7 +1647,8 @@ bool r2d::atlas_place_frame(r2d::atlas_t *atlas, r2d::atlas_entry_t *entry, size
 
 bool r2d::atlas_transfer_frame(r2d::atlas_t *atlas, r2d::atlas_entry_t *entry, size_t frame, void const *pixels)
 {
-    r2d::atlas_frame_t const &bounds = entry->Frames[frame];
+    r2d::atlas_frame_t const &bounds = entry->Frames [frame];
+    size_t             const  pageid = entry->PageIds[frame];
     size_t             const  w      = bounds.Width;
     size_t             const  h      = bounds.Height;
     size_t             const  align  = 4;
@@ -1642,8 +1664,8 @@ bool r2d::atlas_transfer_frame(r2d::atlas_t *atlas, r2d::atlas_entry_t *entry, s
         offset = 0;
     }
 
+    glBindTexture(GL_TEXTURE_2D, atlas->TexturePages[pageid]);
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, atlas->TransferBuffer);
-    glBindTexture(GL_TEXTURE_2D, atlas->TexturePages[entry->PageIds[frame]]);
     GLvoid *buffer_ptr = glMapBufferRange(GL_PIXEL_UNPACK_BUFFER, offset, size, flags);
     if (buffer_ptr != NULL)
     {   // synchronously copy the data into the PBO; unmap the buffer.

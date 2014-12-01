@@ -291,12 +291,36 @@ GLDRAW2D_PUBLIC r2d::atlas_entry_t* get_atlas_entry(r2d::atlas_t *atlas, size_t 
 /// @summary Creates a logical entry on the texture atlas. This only allocates the necessary
 /// structures; it does not place any images or upload any data to texture pages.
 /// @param atlas The image atlas to update.
-/// @param name A unique 32-bit integer identifier for the image withih the atlas.
+/// @param name A unique 32-bit integer identifier for the image within the atlas.
 /// @param frame_count The number of frames in the animation sequence.
 /// @param out_index On return, this location stores the index of the associated atlas entry
 /// within the image atlas, which can be used to look up placement information.
-/// @return true if the image was placed.
-GLDRAW2D_PUBLIC r2d::atlas_entry_t* atlas_add(r2d::atlas_t *atlas, uint32_t name, size_t frame_count, size_t *out_index);
+/// @return The record representing the entry on the image atlas.
+GLDRAW2D_PUBLIC r2d::atlas_entry_t* atlas_create_entry(r2d::atlas_t *atlas, uint32_t name, size_t frame_count, size_t *out_index);
+
+/// @summary Creates a new entry on the image atlas and places one or more rectangles.
+/// @param atlas The image atlas to update.
+/// @param name A unique 32-bit integer identifier for the image within the atlas.
+/// @param frame_count The number of frames in the animation sequence.
+/// @param frame_widths An array of values specifying the horizontal extent of each frame.
+/// @param frame_heights An array of values specifying the vertical extent of each frame.
+/// @param out_index On return, this location stores the index of the associated atlas entry
+/// within the image atlas, which can be used to look up placement information.
+/// @return The record representing the entry on the image atlas.
+GLDRAW2D_PUBLIC r2d::atlas_entry_t* atlas_create_entry(r2d::atlas_t *atlas, uint32_t name, size_t frame_count, size_t const *frame_widths, size_t const *frame_heights, size_t *out_index);
+
+/// @summary Creates a new entry on the image atlas and places one or more rectangles.
+/// @param atlas The image atlas to update.
+/// @param name A unique 32-bit integer identifier for the image within the atlas.
+/// @param frame_count The number of frames in the animation sequence.
+/// @param frame_widths An array of values specifying the horizontal extent of each frame.
+/// @param frame_heights An array of values specifying the vertical extent of each frame.
+/// @param hpad The amount of padding along the horizontal edges of the image, in pixels.
+/// @param vpad The amount of padding along the vertical edges of the image, in pixels.
+/// @param out_index On return, this location stores the index of the associated atlas entry
+/// within the image atlas, which can be used to look up placement information.
+/// @return The record representing the entry on the image atlas.
+GLDRAW2D_PUBLIC r2d::atlas_entry_t* atlas_create_entry(r2d::atlas_t *atlas, uint32_t name, size_t frame_count, size_t const *frame_widths, size_t const *frame_heights, size_t hpad, size_t vpad, size_t *out_index);
 
 /// @summary Places an image within the texture atlas. This only reserves the space for the
 /// image; it does not upload any data to texture pages.
