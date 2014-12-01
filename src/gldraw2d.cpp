@@ -1453,6 +1453,65 @@ bool r2d::atlas_place_frame(r2d::atlas_t *atlas, r2d::atlas_entry_t *entry, size
     return true;
 }
 
+bool r2d::atlas_transfer_frame(r2d::atlas_t *atlas, r2d::atlas_entry_t *entry, size_t frame, void const *pixels)
+{
+    r2d::atlas_frame_t const &bounds = entry->Frames[frame];
+    size_t             const  w      = bounds.Width;
+    size_t             const  h      = bounds.Height;
+    size_t             const  align  = 4;
+    GLenum             const  type   = atlas->PageDataType;
+    GLenum             const  format = atlas->PageFormat;
+    GLsizei            const  size   = gl::bytes_per_slice(format, type, w, h, align);
+    GLintptr                  offset = atlas->BufferOffset;
+    GLbitfield                flags  = GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT | GL_MAP_UNSYNCHRONIZED_BIT;
+
+    if (offset + size > atlas->TransferBytes)
+    {   // additionally discard (orphan) the buffer.
+        flags |= GL_MAP_INVALIDATE_BUFFER_BIT;
+        offset = 0;
+    }
+
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, atlas->TransferBuffer);
+    glBindTexture(GL_TEXTURE_2D, atlas->TexturePages[entry->PageIds[frame]]);
+    GLvoid *buffer_ptr = glMapBufferRange(GL_PIXEL_UNPACK_BUFFER, offset, size, flags);
+    if (buffer_ptr != NULL)
+    {   // synchronously copy the data into the PBO; unmap the buffer.
+        memcpy(buffer_ptr, pixels, size);
+        glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
+
+        // transfer the region from the PBO to the texture memory. the
+        // transfer should be performed asynchronously from the CPU.
+        gl::pixel_transfer_h2d_t x;
+        x.Target          = GL_TEXTURE_2D;
+        x.Format          = format;
+        x.DataType        = type;
+        x.TargetIndex     = 0;
+        x.TargetX         = bounds.X;
+        x.TargetY         = bounds.Y;
+        x.TargetZ         = 0;
+        x.SourceX         = 0;
+        x.SourceY         = 0;
+        x.SourceZ         = 0;
+        x.SourceWidth     = bounds.Width;
+        x.SourceHeight    = bounds.Height;
+        x.TransferWidth   = bounds.Width;
+        x.TransferHeight  = bounds.Height;
+        x.TransferSlices  = 1;
+        x.TransferSize    = size;
+        x.TransferBuffer  = (void*) offset;
+        gl::transfer_pixels_h2d(&x);
+
+        // unbind the transfer buffer and texture page.
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+        // update the current offset within the PBO.
+        atlas->BufferOffset = size_t(offset + size);
+        return true;
+    }
+    else return false;
+}
+
 /*
 bool r2d::atlas_transfer_frame(r2d::atlas_t *atlas, r2d::atlas_entry_t *entry, size_t frame, void const *pixels)
 {
