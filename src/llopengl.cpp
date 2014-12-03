@@ -12,6 +12,7 @@
 #include <intrin.h>
 #endif
 #include <math.h>
+#include <assert.h>
 #include <string.h>
 #include <stdlib.h>
 #include "llopengl.hpp"
@@ -1528,6 +1529,129 @@ void gl::transfer_pixels_d2h(gl::pixel_transfer_d2h_t *transfer)
     if (transfer->TargetX != 0) glPixelStorei(GL_PACK_SKIP_PIXELS,  0);
     if (transfer->TargetY != 0) glPixelStorei(GL_PACK_SKIP_ROWS,    0);
     if (transfer->TargetZ != 0) glPixelStorei(GL_PACK_SKIP_IMAGES,  0);
+}
+
+bool gl::create_pixel_stream_h2d(gl::pixel_stream_h2d_t *stream, size_t alignment, size_t buffer_size)
+{
+    if (stream != NULL)
+    {
+        // ensure the alignment is a power-of-two.
+        assert((alignment & (alignment-1)) == 0);
+
+        // create the pixel buffer object.
+        GLuint pbo = 0;
+        glGenBuffers(1, &pbo);
+        if (pbo == 0)
+        {   // failed to allocate the buffer object.
+            stream->Pbo           = 0;
+            stream->Alignment     = 0;
+            stream->BufferSize    = 0;
+            stream->ReserveOffset = 0;
+            stream->ReserveSize   = 0;
+            return false;
+        }
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
+
+        // determine the reservation alignment.
+        GLint   align  = GLint(alignment);
+        if (alignment == 0)
+        {   // query for the default buffer alignment.
+            glGetIntegerv(GL_UNPACK_ALIGNMENT, &align);
+        }
+
+        // round the buffer size up to a multiple of the alignment.
+        // then allocate storage for the buffer within the driver.
+        GLsizei size   = (buffer_size + (align - 1)) & ~(align - 1);
+        glBufferData(GL_PIXEL_UNPACK_BUFFER, size, NULL, GL_STREAM_DRAW);
+
+        // fill out the buffer descriptor; we're done:
+        stream->Pbo           = pbo;
+        stream->Alignment     = size_t(align);
+        stream->BufferSize    = size_t(size);
+        stream->ReserveOffset = 0;
+        stream->ReserveSize   = 0;
+        return true;
+    }
+    else return false;
+}
+
+void gl::delete_pixel_stream_h2d(gl::pixel_stream_h2d_t *stream)
+{
+    if (stream != NULL)
+    {
+        if (stream->Pbo != 0)
+        {
+            glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+            glDeleteBuffers(1, &stream->Pbo);
+        }
+        stream->Pbo           = 0;
+        stream->Alignment     = 0;
+        stream->BufferSize    = 0;
+        stream->ReserveOffset = 0;
+        stream->ReserveSize   = 0;
+    }
+}
+
+void* gl::pixel_stream_h2d_reserve(gl::pixel_stream_h2d_t *stream, size_t amount)
+{
+    assert(stream->ReserveSize == 0);       // no existing reservation
+    assert(amount <= stream->BufferSize);   // requested amount is less than the buffer size
+
+    GLsizei    align  = stream->Alignment;
+    GLsizei    size   = (amount + (align - 1)) & ~(align - 1);
+    GLintptr   offset = GLintptr(stream->ReserveOffset);
+    GLbitfield access = GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT | GL_MAP_UNSYNCHRONIZED_BIT;
+
+    if (offset + size > stream->BufferSize)
+    {   // orphan the existing buffer and reserve a new buffer.
+        access |= GL_MAP_INVALIDATE_BUFFER_BIT;
+        offset  = 0;
+    }
+
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, stream->Pbo);
+    GLvoid  *b = glMapBufferRange(GL_PIXEL_UNPACK_BUFFER, offset, size, access);
+    if (b != NULL)
+    {   // store a description of the reserved range.
+        stream->ReserveOffset = offset;
+        stream->ReserveSize   = size;
+    }
+    return b;
+}
+
+bool gl::pixel_stream_h2d_commit(gl::pixel_stream_h2d_t *stream, gl::pixel_transfer_h2d_t *transfer)
+{
+    if (stream->ReserveSize > 0)
+    {
+        if (transfer != NULL)
+        {
+            transfer->UnpackBuffer   = stream->Pbo;
+            transfer->TransferSize   = stream->ReserveSize;
+            transfer->TransferBuffer = GL_BUFFER_OFFSET(stream->ReserveOffset);
+        }
+        glBindBuffer (GL_PIXEL_UNPACK_BUFFER, stream->Pbo);
+        glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
+        stream->ReserveOffset += stream->ReserveSize;
+        stream->ReserveSize    = 0;
+        return true;
+    }
+    else if (transfer != NULL)
+    {   // there is no active reservation, so invalidate the transfer structure.
+        transfer->UnpackBuffer   = 0;
+        transfer->TransferSize   = 0;
+        transfer->TransferBuffer = NULL;
+        return false;
+    }
+    else return false;
+}
+
+void gl::pixel_stream_h2d_cancel(gl::pixel_stream_h2d_t *stream)
+{
+    if (stream->ReserveSize > 0)
+    {
+        glBindBuffer (GL_PIXEL_UNPACK_BUFFER, stream->Pbo);
+        glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
+        stream->ReserveSize = 0;
+    }
 }
 
 void gl::transfer_pixels_h2d(gl::pixel_transfer_h2d_t *transfer)

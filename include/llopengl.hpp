@@ -261,6 +261,23 @@ struct pixel_transfer_h2d_t
     void  *TransferBuffer;  /// Pointer to source image data, or PBO byte offset
 };
 
+/// @summary Describes a buffer used to stream data from the host (CPU) to the
+/// device (GPU) using a GPU-asynchronous buffer transfer. The buffer usage is
+/// always GL_STREAM_DRAW, and the target is always GL_PIXEL_UNPACK_BUFFER.
+/// The buffer is allocated in memory accessible to both the CPU and the driver.
+/// Buffer regions are reserved, data copied into the buffer by the CPU, and
+/// then the reservation is committed. The transfer is then performed using
+/// the pixel_transfer_h2d function. A single pixel streaming buffer can be
+/// used to target multiple texture objects.
+struct pixel_stream_h2d_t
+{
+    GLuint Pbo;             /// The pixel buffer object used for streaming.
+    size_t Alignment;       /// The alignment for any buffer reservations.
+    size_t BufferSize;      /// The size of the transfer buffer, in bytes.
+    size_t ReserveOffset;   /// The byte offset of the active reservation.
+    size_t ReserveSize;     /// The size of the active reservation, in bytes.
+};
+
 /// @summary A structure representing a single interleaved sprite vertex in
 /// the vertex buffer. The vertex encodes 2D screen space position, texture
 /// coordinate, and packed ABGR color values into 20 bytes per-vertex. The
@@ -818,6 +835,39 @@ LLOPENGL_PUBLIC void texture_storage(
 /// single mip-level of a texture image.
 /// @param transfer An object describing the transfer operation to execute.
 LLOPENGL_PUBLIC void transfer_pixels_d2h(gl::pixel_transfer_d2h_t *transfer);
+
+/// @summary Allocates a buffer for streaming pixel data from the host (CPU)
+/// to the device (GPU). The buffer exists in driver-accessable memory.
+/// @param stream The stream to initialize.
+/// @param alignment The alignment required for mapped buffers. Specify zero to use the default alignment.
+/// @param size The desired size of the buffer, in bytes.
+/// @return true if the stream is initialized successfully.
+LLOPENGL_PUBLIC bool create_pixel_stream_h2d(gl::pixel_stream_h2d_t *stream, size_t alignment, size_t size);
+
+/// @summary Deletes a host-to-device pixel stream.
+/// @param stream The pixel stream to delete.
+LLOPENGL_PUBLIC void delete_pixel_stream_h2d(gl::pixel_stream_h2d_t *stream);
+
+/// @summary Reserves a portion of the pixel streaming buffer for use by the
+/// application. Note that only one buffer reservation may be active at any given time.
+/// @param stream The pixel stream to allocate from.
+/// @param size The number of bytes to allocate.
+/// @return A pointer to the start of the reserved region, or NULL.
+LLOPENGL_PUBLIC void* pixel_stream_h2d_reserve(gl::pixel_stream_h2d_t *stream, size_t size);
+
+/// @summary Commits the reserved region of the buffer, indicating that the
+/// application has finished accessing the buffer directly. The reserved portion
+/// of the buffer may now be used as a transfer source.
+/// @param stream The stream to commit.
+/// @param transfer The transfer object to populate. The UnpackBuffer, TransferSize and TransferBuffer fields will be modified.
+/// @return true if the transfer was successfully committed.
+LLOPENGL_PUBLIC bool pixel_stream_h2d_commit(gl::pixel_stream_h2d_t *stream, gl::pixel_transfer_h2d_t *transfer);
+
+/// @summary Cancels the reserved region of the buffer, indicating that the
+/// application has finished accessing the buffer directly. The reserved
+/// portion of the buffer will be rolled back, anc cannot be used as a transfer source.
+/// @param stream The stream to roll back.
+LLOPENGL_PUBLIC void pixel_stream_h2d_cancel(gl::pixel_stream_h2d_t *stream);
 
 /// @summary Copies pixel data from the host (CPU) to the device (GPU). The
 /// pixel data is copied to a single mip-level of a texture image.
